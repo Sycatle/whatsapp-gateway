@@ -1,22 +1,23 @@
 # whatsapp-handler
 
-WhatsApp Cloud API handler in TypeScript: a signed webhook receiver, a sender for every message type, and a local store of conversations. No runtime dependencies.
+WhatsApp Cloud API handler in TypeScript: a signed webhook receiver, a sender for every message type, and a local store of conversations.
 
 - **Receives** every message type, edits, deletions, delivery statuses, history and contacts of a coexistence number, and downloads media.
 - **Keeps** messages, contacts and the 24 h window per chat in SQLite, queryable over HTTP.
+- **Transcribes** voice notes with a local or hosted Whisper.
 - **Forwards** each processed event to your own service, signed.
 - **Sends** text, media, voice notes, stickers, locations, contacts, buttons and lists, templates, reactions and quoted replies; marks messages read; reaches the rest of the Cloud API through a gateway.
 
 ## Run
 
-Requires Node.js 22+ and a Meta app with the WhatsApp use case ([setup](docs/meta-setup.md)).
+Requires Node.js 22.13+ (for `node:sqlite`) and a Meta app with the WhatsApp use case ([setup](docs/meta-setup.md)).
 
 ```bash
 npm ci
 cp .env.example .env && chmod 600 .env   # then fill it in
 npm start                                # or `npm run dev` to reload on change
 npm run check                            # type-check
-npm test                                 # node:test, no extra dependency
+npm test                                 # node:test, Graph API mocked, no network
 ```
 
 The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunnel.
@@ -131,4 +132,4 @@ WhatsApp users who adopt a username may reach you without a phone number, only w
 
 `windowOpen` is computed from stored messages: a chat whose last user message predates the database reports a closed window until the user writes again.
 
-Messages, contacts and delivery statuses are kept in a local SQLite file (`node:sqlite`, experimental in Node 22, no dependency). It and `DOWNLOADS_DIR` hold personal data: keep them private and back them up as such. Message content never goes to the logs, but it does go to `EVENTS_URL`: use HTTPS. History messages stay in the store; only their progress is forwarded. A user deleting a message erases its content and file locally. Retried deliveries are dropped using an in-memory window of recent ids; a crash can still lose an event that was acknowledged but not yet processed.
+Messages, contacts and delivery statuses are kept in a local SQLite file (`node:sqlite`, experimental in Node 22). It and `DOWNLOADS_DIR` hold personal data: keep them private and back them up as such. Message content never goes to the logs, but it does go to `EVENTS_URL`: use HTTPS. History messages stay in the store; only their progress is forwarded. A user deleting a message erases its content and file locally. Retried deliveries are dropped using an in-memory window of recent ids; a crash can still lose an event that was acknowledged but not yet processed.

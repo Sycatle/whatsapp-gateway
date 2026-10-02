@@ -91,6 +91,8 @@ loginctl enable-linger "$USER"      # keep running after logout and across reboo
 journalctl --user -u whatsapp-handler -f
 ```
 
+If you use `scripts/whisper-server.py`, give it its own unit the same way and add `After=whisper-server.service` to the handler's `[Unit]`.
+
 If `npm` is not on systemd's `PATH` (version managers such as fnm), use the absolute path of `npm` in `ExecStart`. Do the same for `cloudflared` with a second unit.
 
 ## Check sending and media
@@ -100,3 +102,4 @@ With sending configured, within the 24-hour window:
 1. `POST /messages` with a text: you receive it, and the `sent`, `delivered` and `read` statuses show in the log.
 2. `POST /media` with a PNG, a PDF (`filename=`), an MP3, and a mono Ogg/Opus file with `voice=true`: each arrives as the right kind of message.
 3. Send an image, a voice note and a document to the test number: files appear in `DOWNLOADS_DIR` and the log prints `media saved`.
+4. Receiving: send the test number a text, a photo, a voice note, a PDF, a video, a sticker, a location, a reaction, a button tap, a quoted reply, then an edited and a deleted text. Check `GET /conversations/<chat>/messages`: each shows up with its content, files appear in `DOWNLOADS_DIR`, an edit sets `edited`, a deletion clears the content and the file, and voice notes carry `content.transcript` when `TRANSCRIBE_URL` is set.
