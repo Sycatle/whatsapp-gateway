@@ -57,8 +57,6 @@ Webhook payloads larger than 1 MiB are rejected. Requests without a valid signat
 | `PORT` | Local listening port, default `3000`. |
 | `META_APP_SECRET` | Required for webhook signature verification. |
 | `WHATSAPP_VERIFY_TOKEN` | Required shared token for the webhook verification handshake; choose it yourself. |
-| `WHATSAPP_PHONE_NUMBER_ID` | Graph API phone number identifier; reserved for sending integration. |
-| `WHATSAPP_BUSINESS_ACCOUNT_ID` | WhatsApp Business Account identifier; used during account subscription setup. |
 
 An API access token is also needed for direct Graph API calls. It is separate from both the app secret and the webhook verification token. The current server does not read an access token. Temporary tokens must be regenerated when they expire.
 
