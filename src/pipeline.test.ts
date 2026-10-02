@@ -31,6 +31,30 @@ describe('pipeline', () => {
     assert.equal(store.messages('1')[0]!.status, 'read');
   });
 
+  it('applies events in arrival order and drains on idle', async () => {
+    const store = openStore(':memory:');
+    const pipeline = createPipeline({ downloadsDir: 'unused', store });
+    pipeline.enqueue(wrap({ messages: [{ id: 'o', from: '1', type: 'text', text: { body: 'x' } }] }));
+    pipeline.enqueue(wrap({ statuses: [{ id: 'o', status: 'read', recipient_id: '1' }] }));
+    await pipeline.idle();
+    assert.equal(store.messages('1')[0]!.status, 'read');
+  });
+
+  it('keeps going and still forwards when a step fails', async () => {
+    mock.method(console, 'error', () => {});
+    const store = openStore(':memory:');
+    mock.method(store, 'applyStatus', () => { throw new Error('boom'); });
+    const forwarded: ParsedEvent[] = [];
+    const pipeline = createPipeline({ downloadsDir: 'unused', store, forward: (e) => forwarded.push(e) });
+    await pipeline(wrap({
+      messages: [{ id: 'k', from: '1', type: 'text', text: { body: 'x' } }],
+      statuses: [{ id: 'k', status: 'read', recipient_id: '1' }],
+    }));
+    await pipeline(wrap({ messages: [{ id: 'k2', from: '1', type: 'text', text: { body: 'y' } }] }));
+    assert.deepEqual(store.messages('1').map((m) => m.id).sort(), ['k', 'k2']);
+    assert.equal(forwarded.length, 2);
+  });
+
   it('downloads media that arrives later in the history sync', async () => {
     mock.method(globalThis, 'fetch', async (url: string | URL | Request) =>
       String(url).endsWith('/88')

@@ -15,15 +15,15 @@ import { openStore } from './store.js';
 import { createTranscriber } from './transcribe.js';
 import { receiveEvent, verifyHandshake } from './webhook.js';
 
-export function createApp(config: Config): Server {
+export type App = Server & { shutdown(): Promise<void> };
+
+export function createApp(config: Config): App {
   const seen = new SeenKeys();
   const graph = config.graph && createGraph(config.graph);
   const store = openStore(config.dbPath);
 
   const pipeline = createPipeline({ downloadsDir: config.downloadsDir, store, graph, transcribe: createTranscriber(config.transcribe), forward: createSink(config.events) });
-  const handleEvent = (event: ParsedEvent) => {
-    pipeline(event).catch((error) => console.error('event processing failed:', error instanceof Error ? error.message : error));
-  };
+  const handleEvent = (event: ParsedEvent) => pipeline.enqueue(event);
 
   /** Everything but the webhook is public through the tunnel: demand the API key (503 if none is configured). */
   const authorized = ({ req, res }: Context): boolean => {
@@ -91,6 +91,9 @@ export function createApp(config: Config): Server {
       sendJson(res, 500, { error: 'Internal error' });
     }
   });
-  server.on('close', () => store.close());
-  return server;
+  /** Waits for acknowledged events to be processed, then closes the store. Safe to call repeatedly. */
+  let stopping: Promise<void> | undefined;
+  const shutdown = () => (stopping ??= pipeline.idle().finally(() => store.close()));
+  server.on('close', () => void shutdown());
+  return Object.assign(server, { shutdown });
 }
