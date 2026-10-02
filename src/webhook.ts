@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { safeEqual, verifySignature } from './auth.js';
 import type { Config } from './config.js';
+import { describe, parseEvent } from './events.js';
 
 const MAX_BODY = 1024 * 1024;
 
@@ -29,9 +30,9 @@ export async function receiveEvent(req: IncomingMessage, res: ServerResponse, co
       res.writeHead(403).end('Invalid signature');
       return;
     }
-    const event: unknown = JSON.parse(body.toString());
+    const event = parseEvent(JSON.parse(body.toString()));
     res.writeHead(200).end('EVENT_RECEIVED');
-    console.log(JSON.stringify({ receivedAt: new Date().toISOString(), event }, null, 2));
+    for (const line of describe(event)) console.log(line);
   } catch (error) {
     console.error(error);
     if (!res.headersSent) res.writeHead(400).end('Invalid request');

@@ -2,7 +2,7 @@
 
 Minimal WhatsApp Cloud API webhook receiver in TypeScript. No runtime dependencies, no database.
 
-It verifies the Meta handshake, authenticates events with `X-Hub-Signature-256` over the raw body, and logs them.
+It verifies the Meta handshake, authenticates events with `X-Hub-Signature-256` over the raw body, and logs a one-line summary per message or status.
 
 ## Run
 
@@ -24,7 +24,7 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | --- | --- | --- |
 | GET | `/health` | `{"ok":true}` |
 | GET | `/webhook` | Meta verification handshake. |
-| POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs. Bodies over 1 MiB get 413. |
+| POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per message or status (phone masked, no content). Bodies over 1 MiB get 413. |
 
 ## Environment
 
@@ -36,4 +36,4 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 
 ## Limits
 
-Events are not persisted or deduplicated: a crash loses unprocessed work, and Meta may retry deliveries. Logs and downloaded files can contain personal data; keep them private.
+Events are not persisted or deduplicated: a crash loses unprocessed work, and Meta may retry deliveries. Logs hold no message content, but downloaded files can contain personal data; keep them private.
