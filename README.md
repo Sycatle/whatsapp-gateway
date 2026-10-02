@@ -11,7 +11,7 @@ Requires Node.js 22+ and a Meta app with the WhatsApp use case ([setup](docs/met
 ```bash
 npm ci
 cp .env.example .env && chmod 600 .env   # then fill it in
-npm run dev
+npm start                                # or `npm run dev` to reload on change
 npm run check                            # type-check
 npm test                                 # node:test, no extra dependency
 ```
