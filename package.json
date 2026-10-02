@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-handler",
-  "description": "WhatsApp Cloud API handler: signed webhook receiver, sender for every message type and local conversation store, with no runtime dependencies.",
+  "description": "WhatsApp Cloud API handler: signed webhook receiver, sender for every message type, local conversation store and voice transcription.",
   "private": true,
   "type": "module",
   "engines": {
