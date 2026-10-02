@@ -4,8 +4,3 @@ node_modules/
 !.env.example
 downloads/
 *.log
-.playwright-mcp/
-dist/
-coverage/
-*.pem
-*.key
