@@ -31,7 +31,8 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | GET | `/contacts` | Known contacts (address-book and profile names). Same auth. |
 | POST | `/messages` | Sends any message type. Same auth. 503 if sending is not configured. |
 | POST | `/read` | `{"message_id":"wamid...","typing":true}`: marks a received message as read (blue ticks) and optionally shows "typing..." until you reply or 25 s pass. Same auth. |
-| POST | `/media` | Uploads the body and sends it as image, audio or document. Same auth. |
+| POST | `/media` | Uploads the body and sends it as image, video, audio, sticker or document. Same auth. |
+| GET, DELETE | `/media/:id` | Downloads a media file from Meta by id, or deletes an uploaded one. Same auth. |
 
 `POST /messages` takes JSON: a recipient (`to`: digits only, international format, or `group`), a `type` (default `text`) and the Cloud API object of that type. Optional `reply_to` (a message id) quotes a message.
 
@@ -57,7 +58,7 @@ curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
   -H "Authorization: Bearer $API_KEY" -H 'Content-Type: image/png' --data-binary @photo.png
 ```
 
-`POST /media` takes the raw file as body and its MIME type as `Content-Type`. `image/*` is sent as an image (max 5 MiB), `audio/*` as audio (16 MiB), anything else as a document (100 MiB, use `filename=`). `caption` applies to images and documents. Add `voice=true` with a mono Ogg/Opus file (`Content-Type: audio/ogg`) to send a real voice note; other files are rejected with 400. Meta only shows the play button for voice notes up to 512 KB.
+`POST /media` takes the raw file as body and its MIME type as `Content-Type`. `image/*` is sent as an image (max 5 MiB), `video/*` as a video (16 MiB), `audio/*` as audio (16 MiB), anything else as a document (100 MiB, use `filename=`). `sticker=true` with `image/webp` sends a sticker (500 KB). `caption` applies to images, videos and documents; `reply_to=<message id>` quotes a message. Add `voice=true` with a mono Ogg/Opus file (`Content-Type: audio/ogg`) to send a real voice note; other files are rejected with 400. Meta only shows the play button for voice notes up to 512 KB.
 
 Free-form messages only work within 24 hours of the recipient's last message (see `windowOpen` in `/conversations`); otherwise use a template. Meta's refusals come back as 502 with Meta's error message and code. `group` needs the Groups API (official business account, not available in coexistence).
 

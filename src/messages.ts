@@ -51,9 +51,11 @@ async function deliver(
 const MiB = 1024 * 1024;
 
 /** Message type and size limit (WhatsApp's own caps) derived from the MIME type. */
-function classify(mimeType: string): { type: 'image' | 'audio' | 'document'; limit: number } {
+function classify(mimeType: string, sticker: boolean): { type: 'image' | 'audio' | 'video' | 'document' | 'sticker'; limit: number } {
+  if (sticker) return { type: 'sticker', limit: 500 * 1024 };
   if (mimeType.startsWith('image/')) return { type: 'image', limit: 5 * MiB };
   if (mimeType.startsWith('audio/')) return { type: 'audio', limit: 16 * MiB };
+  if (mimeType.startsWith('video/')) return { type: 'video', limit: 16 * MiB };
   return { type: 'document', limit: 100 * MiB };
 }
 
@@ -67,7 +69,10 @@ function voiceProblem(bytes: Buffer, mimeType: string): string | null {
   return null;
 }
 
-/** Sends the request body as a media message: `POST /media?to=...[&filename=...][&caption=...][&voice=true]`. */
+/**
+ * Sends the request body as a media message:
+ * `POST /media?to=...[&filename=...][&caption=...][&voice=true][&sticker=true][&reply_to=...]`.
+ */
 export async function sendMedia(req: IncomingMessage, res: ServerResponse, deps: SendDeps): Promise<void> {
   const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
   const to = params.get('to');
@@ -75,7 +80,9 @@ export async function sendMedia(req: IncomingMessage, res: ServerResponse, deps:
   if (!to || !PHONE.test(to)) return sendJson(res, 400, { error: '"to" must be digits only, in international format' });
   if (!mimeType) return sendJson(res, 400, { error: 'Content-Type must be the file MIME type' });
 
-  const { type, limit } = classify(mimeType);
+  const sticker = params.get('sticker') === 'true';
+  if (sticker && mimeType !== 'image/webp') return sendJson(res, 400, { error: 'Stickers must be image/webp' });
+  const { type, limit } = classify(mimeType, sticker);
   const bytes = await readBody(req, res, limit);
   if (!bytes) return;
   if (!bytes.length) return sendJson(res, 400, { error: 'Empty body' });
@@ -95,11 +102,11 @@ export async function sendMedia(req: IncomingMessage, res: ServerResponse, deps:
   }
   const media = {
     id: mediaId,
-    ...(caption && type !== 'audio' && { caption }),
+    ...(caption && (type === 'image' || type === 'video' || type === 'document') && { caption }),
     ...(voice && { voice: true }),
     ...(type === 'document' && { filename }),
   };
-  await deliver(deps, res, { chat: to, group: false }, type, media);
+  await deliver(deps, res, { chat: to, group: false }, type, media, params.get('reply_to') ?? undefined);
 }
 
 /**

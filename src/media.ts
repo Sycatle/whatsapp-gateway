@@ -1,7 +1,9 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Message } from './events.js';
-import type { Graph } from './graph.js';
+import { GraphError, type Graph } from './graph.js';
+import { sendJson } from './http.js';
+import type { Context } from './router.js';
 
 const MAX_BYTES = 100 * 1024 * 1024;
 
@@ -41,4 +43,30 @@ export async function saveMedia(graph: Graph, dir: string, message: Pick<Message
   const path = join(dir, `${id}.${extension}`);
   await writeFile(path, bytes, { mode: 0o600 });
   return path;
+}
+
+const MEDIA_ID = /^\w+$/;
+
+/** `GET /media/:id`: downloads a media file from Meta (ids come from received messages or uploads). */
+export async function fetchMedia({ res, params }: Context, graph: Graph): Promise<void> {
+  if (!MEDIA_ID.test(params.id!)) return sendJson(res, 400, { error: 'Invalid media id' });
+  try {
+    const { bytes, mimeType } = await graph.download(params.id!, MAX_BYTES);
+    res.writeHead(200, { 'Content-Type': mimeType, 'Content-Length': bytes.length }).end(bytes);
+  } catch (error) {
+    if (!(error instanceof GraphError)) throw error;
+    sendJson(res, 502, { error: error.message, code: error.code });
+  }
+}
+
+/** `DELETE /media/:id`: removes an uploaded file from Meta's servers. */
+export async function deleteMedia({ res, params }: Context, graph: Graph): Promise<void> {
+  if (!MEDIA_ID.test(params.id!)) return sendJson(res, 400, { error: 'Invalid media id' });
+  try {
+    await graph.request(params.id!, { method: 'DELETE' });
+    sendJson(res, 200, { ok: true });
+  } catch (error) {
+    if (!(error instanceof GraphError)) throw error;
+    sendJson(res, 502, { error: error.message, code: error.code });
+  }
 }

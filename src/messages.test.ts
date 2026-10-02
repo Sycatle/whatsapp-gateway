@@ -212,6 +212,33 @@ describe('POST /messages', () => {
       assert.equal((await upload('to=33600000000&voice=true', 'image/png')).status, 400);
     });
 
+    it('sends videos as videos and stickers as stickers, quoting when asked', async () => {
+      const calls = stubGraph();
+      await upload('to=33600000000&caption=Clip&reply_to=wamid.q', 'video/mp4');
+      assert.deepEqual(JSON.parse(calls[1]!.body as string).video, { id: 'media.1', caption: 'Clip' });
+      assert.deepEqual(JSON.parse(calls[1]!.body as string).context, { message_id: 'wamid.q' });
+      await upload('to=33600000000&sticker=true', 'image/webp');
+      assert.deepEqual(JSON.parse(calls[3]!.body as string).sticker, { id: 'media.1' });
+      assert.equal((await upload('to=33600000000&sticker=true', 'image/png')).status, 400);
+    });
+
+    it('fetches and deletes media by id', async () => {
+      const calls: { url: string; method?: string }[] = [];
+      mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).startsWith(base)) return realFetch(url, init);
+        calls.push({ url: String(url), method: init?.method });
+        return String(url).endsWith('/321') && init?.method !== 'DELETE'
+          ? new Response(JSON.stringify({ url: 'https://cdn.example/f', mime_type: 'image/png' }))
+          : String(url).includes('cdn.example') ? new Response('png-bytes') : new Response(JSON.stringify({ success: true }));
+      });
+      const auth = { Authorization: 'Bearer key' };
+      const got = await realFetch(`${base}/media/321`, { headers: auth });
+      assert.deepEqual([got.status, got.headers.get('content-type'), await got.text()], [200, 'image/png', 'png-bytes']);
+      assert.equal((await realFetch(`${base}/media/321`, { method: 'DELETE', headers: auth })).status, 200);
+      assert.equal(calls.at(-1)!.method, 'DELETE');
+      assert.equal((await realFetch(`${base}/media/..%2Fx`, { headers: auth })).status, 400);
+    });
+
     it('requires a recipient and a body', async () => {
       assert.equal((await upload('to=abc', 'image/png')).status, 400);
       assert.equal((await upload('to=33600000000', 'image/png', '')).status, 400);
