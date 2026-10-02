@@ -20,6 +20,14 @@ describe('store', () => {
     assert.deepEqual(store.messages('33600000001', 10, 2000).map((m) => m.id), ['m1']);
   });
 
+  it('pages with a composite cursor when timestamps collide', () => {
+    store.saveMessages(['a', 'b', 'c'].map((id) => message({ id, timestamp: 1000 })));
+    const first = store.messages('33600000001', 2);
+    assert.deepEqual(first.map((m) => m.id), ['a', 'b']);
+    assert.deepEqual(store.messages('33600000001', 2, 1000, 'b').map((m) => m.id), ['c']);
+    assert.deepEqual(store.messages('33600000001', 2, 1000).map((m) => m.id), []);
+  });
+
   it('only moves delivery status forward, except for failures', () => {
     store.saveMessages([message({ direction: 'out', status: 'sent' })]);
     const status = (s: string) => { store.applyStatus({ id: 'm1', status: s, recipient: 'x', timestamp: 1 }); return store.messages('33600000001')[0]!.status; };

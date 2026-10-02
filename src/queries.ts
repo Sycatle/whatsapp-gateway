@@ -15,15 +15,19 @@ export function listConversations({ res, url }: Context, store: Store): void {
   sendJson(res, 200, { conversations: store.conversations(intParam(url.searchParams.get('limit'), 50, 500)) });
 }
 
-/** Newest first; pass the oldest `timestamp` received as `before` to page back. */
+/** Newest first; pass the last message's `timestamp` and `id` as `before` and `before_id` to page back. */
 export function listMessages({ res, url, params }: Context, store: Store): void {
   if (!CHAT.test(params.chat!)) return sendJson(res, 400, { error: 'Invalid chat' });
   const before = url.searchParams.get('before');
+  const beforeId = url.searchParams.get('before_id');
+  if (before !== null && !/^\d{1,15}$/.test(before)) return sendJson(res, 400, { error: '"before" must be a timestamp' });
+  if (beforeId !== null && before === null) return sendJson(res, 400, { error: '"before_id" needs "before"' });
   sendJson(res, 200, {
     messages: store.messages(
       params.chat!,
       intParam(url.searchParams.get('limit'), 50, 500),
       before === null ? undefined : Number(before),
+      beforeId,
     ),
   });
 }

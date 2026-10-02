@@ -101,7 +101,8 @@ export function openStore(path: string) {
     thread: db.prepare(`
       SELECT id, chat, sender AS "from", direction, source, type, timestamp, content, context_id AS contextId,
              status, media_path AS mediaPath, edited, deleted
-      FROM messages WHERE chat = ? AND timestamp < ? ORDER BY timestamp DESC, id LIMIT ?`),
+      FROM messages WHERE chat = ? AND (timestamp < ? OR (timestamp = ? AND id > ?))
+      ORDER BY timestamp DESC, id LIMIT ?`),
     chatMedia: db.prepare('SELECT media_path FROM messages WHERE chat = ? AND media_path IS NOT NULL'),
     alias: db.prepare('SELECT phone FROM aliases WHERE user_id = ?'),
     setAlias: db.prepare(`
@@ -194,9 +195,13 @@ export function openStore(path: string) {
       });
     },
 
-    /** Newest first. Pass the oldest timestamp received as `before` to get the previous page. */
-    messages(chat: string, limit = 50, before = Number.MAX_SAFE_INTEGER): StoredMessage[] {
-      const rows = q.thread.all(resolve(chat), before, limit) as (Omit<StoredMessage, 'content' | 'edited' | 'deleted'> & {
+    /**
+     * Newest first. Pass the last message received as `before` / `beforeId` to get the next page; messages sharing
+     * a timestamp are ordered by id, so none is skipped. Without `beforeId`, everything older than `before` is returned.
+     */
+    messages(chat: string, limit = 50, before = Number.MAX_SAFE_INTEGER, beforeId: string | null = null): StoredMessage[] {
+      // `id > NULL` is never true: with no id, the equal-timestamp branch matches nothing.
+      const rows = q.thread.all(resolve(chat), before, before, beforeId, limit) as (Omit<StoredMessage, 'content' | 'edited' | 'deleted'> & {
         content: string | null; edited: number; deleted: number;
       })[];
       return rows.map((row) => ({

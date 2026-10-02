@@ -66,6 +66,26 @@ describe('read API', () => {
     assert.equal((await get('/conversations/a%20b/messages')).status, 400);
   });
 
+  it('rejects an invalid pagination cursor', async () => {
+    assert.equal((await get('/conversations/33600000001/messages?before=abc')).status, 400);
+    assert.equal((await get('/conversations/33600000001/messages?before_id=m1')).status, 400);
+  });
+
+  it('pages through messages sharing a timestamp without skipping any', async () => {
+    await webhook({
+      messages: ['a', 'b', 'c'].map((id) => ({ id, from: '33600000009', timestamp: '1700000500', type: 'text', text: { body: id } })),
+    });
+    const seen: string[] = [];
+    let cursor = '';
+    for (let i = 0; i < 5; i++) {
+      const { messages } = await (await get(`/conversations/33600000009/messages?limit=1${cursor}`)).json() as { messages: { id: string; timestamp: number }[] };
+      if (!messages.length) break;
+      seen.push(messages[0]!.id);
+      cursor = `&before=${messages[0]!.timestamp}&before_id=${messages[0]!.id}`;
+    }
+    assert.deepEqual(seen, ['a', 'b', 'c']);
+  });
+
   it('survives a request URL the parser rejects', async () => {
     const { connect } = await import('node:net');
     const { port } = server.address() as AddressInfo;
