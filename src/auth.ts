@@ -10,3 +10,7 @@ export function verifySignature(body: Buffer, header: string | undefined, appSec
   const expected = `sha256=${createHmac('sha256', appSecret).update(body).digest('hex')}`;
   return safeEqual(header ?? '', expected);
 }
+
+export function hasBearer(header: string | undefined, apiKey: string): boolean {
+  return safeEqual(header ?? '', `Bearer ${apiKey}`);
+}

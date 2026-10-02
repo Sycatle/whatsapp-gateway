@@ -25,3 +25,7 @@ export function readBody(req: IncomingMessage, res: ServerResponse, limit: numbe
     req.once('error', reject);
   });
 }
+
+export function sendJson(res: ServerResponse, status: number, body: unknown): void {
+  res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+}

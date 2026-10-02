@@ -1,21 +1,40 @@
-import { createServer, type Server } from 'node:http';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { hasBearer } from './auth.js';
 import type { Config } from './config.js';
 import { SeenKeys } from './events.js';
+import { createGraph, type Graph } from './graph.js';
+import { sendJson } from './http.js';
+import { sendText } from './messages.js';
 import { receiveEvent, verifyHandshake } from './webhook.js';
 
 export function createApp(config: Config): Server {
   const seen = new SeenKeys();
+  const graph = config.graph && createGraph(config.graph);
+
+  /** Runs a sending route only for a configured server and an authorized caller. */
+  const protectedRoute = (handler: (req: IncomingMessage, res: ServerResponse, graph: Graph) => Promise<void>) =>
+    async (req: IncomingMessage, res: ServerResponse) => {
+      if (!config.graph || !graph) return sendJson(res, 503, { error: 'Sending is not configured' });
+      if (!hasBearer(req.headers.authorization, config.graph.apiKey)) return sendJson(res, 401, { error: 'Unauthorized' });
+      await handler(req, res, graph);
+    };
+
+  const routes: Record<string, (req: IncomingMessage, res: ServerResponse, url: URL) => void | Promise<void>> = {
+    'GET /health': (_req, res) => sendJson(res, 200, { ok: true }),
+    'GET /webhook': (_req, res, url) => verifyHandshake(url, res, config),
+    'POST /webhook': (req, res) => receiveEvent(req, res, config, seen),
+    'POST /messages': protectedRoute(sendText),
+  };
+
   return createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
-    if (req.method === 'GET' && url.pathname === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true }));
-    } else if (req.method === 'GET' && url.pathname === '/webhook') {
-      verifyHandshake(url, res, config);
-    } else if (req.method === 'POST' && url.pathname === '/webhook') {
-      await receiveEvent(req, res, config, seen);
-    } else {
-      res.writeHead(404).end('Not found');
+    const route = routes[`${req.method} ${url.pathname}`];
+    try {
+      if (route) await route(req, res, url);
+      else res.writeHead(404).end('Not found');
+    } catch (error) {
+      console.error(error);
+      if (!res.headersSent) sendJson(res, 500, { error: 'Internal error' });
     }
   });
 }

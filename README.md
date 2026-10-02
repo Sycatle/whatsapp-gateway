@@ -25,6 +25,15 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | GET | `/health` | `{"ok":true}` |
 | GET | `/webhook` | Meta verification handshake. |
 | POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per message or status (phone masked, no content). Bodies over 1 MiB get 413. |
+| POST | `/messages` | Sends a text. Requires `Authorization: Bearer $API_KEY`. 503 if sending is not configured. |
+
+```bash
+curl -X POST http://127.0.0.1:3000/messages \
+  -H "Authorization: Bearer $API_KEY" -H 'Content-Type: application/json' \
+  -d '{"to":"33600000000","text":"Hello"}'
+```
+
+`to` is digits only, in international format. Free-form text only works within 24 hours of the recipient's last message; otherwise Meta rejects it (reported as 502 with Meta's error).
 
 ## Environment
 
