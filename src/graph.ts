@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 import type { GraphConfig } from './config.js';
 
+/** Generous: uploads and downloads can reach 100 MiB. */
+const TIMEOUT_MS = 120_000;
+
 export class GraphError extends Error {
   constructor(message: string, readonly status: number, readonly code?: number) {
     super(message);
@@ -17,6 +20,7 @@ export function createGraph(config: GraphConfig) {
     return fetch(path.startsWith('https://') ? path : `${base}/${path}`, {
       ...init,
       headers: { Authorization: `Bearer ${config.accessToken}`, ...init.headers },
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   }
 
