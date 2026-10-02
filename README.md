@@ -30,7 +30,7 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | GET | `/webhook` | Meta verification handshake. |
 | POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per item (ids masked, no content). Understands every message type, edits and deletions by users, messages sent from the Business app, history and contact sync (coexistence), and passes other fields (templates, quality, account updates) through. With sending configured, also saves received images, videos, stickers, audio, voice notes and documents to `DOWNLOADS_DIR`. Bodies over 16 MiB get 413. |
 | GET | `/conversations` | Chats with last activity and whether the 24 h window is open (`windowOpen`, `windowExpiresAt`). `?limit=`. Requires `Authorization: Bearer $API_KEY`. |
-| GET | `/conversations/:chat/messages` | Messages of a chat, newest first. `?limit=` and `?before=<timestamp>` to page. Same auth. |
+| GET | `/conversations/:chat/messages` | Messages of a chat, newest first. `?limit=` to size a page; to get the next one, pass the last message's `timestamp` and `id` as `?before=` and `&before_id=`. Same auth. |
 | DELETE | `/conversations/:chat` | Erases the chat's messages, contact entry and downloaded files. Same auth. |
 | GET | `/contacts` | Known contacts (address-book and profile names). Same auth. |
 | POST | `/messages` | Sends any message type. Same auth. 503 if sending is not configured. |
@@ -65,7 +65,7 @@ curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
 
 `POST /media` takes the raw file as body and its MIME type as `Content-Type`. `image/*` is sent as an image (max 5 MiB), `video/*` as a video (16 MiB), `audio/*` as audio (16 MiB), anything else as a document (100 MiB, use `filename=`). `sticker=true` with `image/webp` sends a sticker (500 KB). `caption` applies to images, videos and documents; `reply_to=<message id>` quotes a message. Add `voice=true` with a mono Ogg/Opus file (`Content-Type: audio/ogg`) to send a real voice note; other files are rejected with 400. Meta only shows the play button for voice notes up to 512 KB.
 
-Free-form messages only work within 24 hours of the recipient's last message (see `windowOpen` in `/conversations`); otherwise use a template. Meta's refusals come back as 502 with Meta's error message and code. `group` needs the Groups API (official business account, not available in coexistence).
+Free-form messages only work within 24 hours of the recipient's last message (see `windowOpen` in `/conversations`); otherwise use a template. Meta's refusals come back as 502 with Meta's error message and code (504 when Meta times out, 502 when it cannot be reached). `group` needs the Groups API (official business account, not available in coexistence).
 
 ## Everything else: `/phone` and `/waba`
 
@@ -105,7 +105,7 @@ Paths and bodies are Meta's: see the [Cloud API reference](https://developers.fa
 | `EVENTS_SECRET` | Required with `EVENTS_URL`. Each POST carries `X-Hub-Signature-256: sha256=<HMAC of the body>` keyed with it, so you verify it exactly like Meta's. |
 | `TRANSCRIBE_URL` | Optional. OpenAI-compatible `/v1/audio/transcriptions` endpoint: voice notes and audio are transcribed into `content.transcript`. |
 | `TRANSCRIBE_MODEL`, `TRANSCRIBE_LANGUAGE`, `TRANSCRIBE_API_KEY` | Model name sent to the endpoint (default `whisper-1`), optional language hint (`fr`; detected otherwise), bearer key for hosted services. |
-| `DB_PATH` | SQLite file for messages, statuses and contacts, default `data/handler.db` (created with mode 600). |
+| `DB_PATH` | SQLite file for messages, statuses and contacts, default `data/gateway.db` (created with mode 600). |
 | `DOWNLOADS_DIR` | Where received media is saved, default `downloads`. Files are `<media id>.<ext>`, mode 600, capped at 100 MiB, checksum-verified. |
 
 ## Voice transcription
@@ -122,14 +122,14 @@ python3 scripts/whisper-server.py large-v3-turbo 8178   # model and port are opt
 
 ## Not possible through the API
 
-Meta exposes no way to edit or delete a message you sent, to list chats from Meta's side, to read history before the webhook subscription (coexistence history sync aside), to post statuses, or to archive, pin or star chats. Users can edit and delete theirs, and the handler applies that.
+Meta exposes no way to edit or delete a message you sent, to list chats from Meta's side, to read history before the webhook subscription (coexistence history sync aside), to post statuses, or to archive, pin or star chats. Users can edit and delete theirs, and the gateway applies that.
 
 ## Usernames (BSUID)
 
-WhatsApp users who adopt a username may reach you without a phone number, only with a business-scoped user id. The handler files such a chat under the BSUID, merges it into the phone chat as soon as both are seen together, and `POST /messages` accepts either as `to`.
+WhatsApp users who adopt a username may reach you without a phone number, only with a business-scoped user id. The gateway files such a chat under the BSUID, merges it into the phone chat as soon as both are seen together, and `POST /messages` accepts either as `to`.
 
 ## Limits
 
 `windowOpen` is computed from stored messages: a chat whose last user message predates the database reports a closed window until the user writes again.
 
-Messages, contacts and delivery statuses are kept in a local SQLite file (`node:sqlite`, experimental in Node 22). It and `DOWNLOADS_DIR` hold personal data: keep them private and back them up as such. Message content never goes to the logs, but it does go to `EVENTS_URL`: use HTTPS. History messages stay in the store; only their progress is forwarded. A user deleting a message erases its content and file locally. Retried deliveries are dropped using an in-memory window of recent ids; a crash can still lose an event that was acknowledged but not yet processed.
+Messages, contacts and delivery statuses are kept in a local SQLite file (`node:sqlite`, experimental in Node 22). It and `DOWNLOADS_DIR` hold personal data: keep them private and back them up as such. Message content never goes to the logs, but it does go to `EVENTS_URL`: use HTTPS. History messages stay in the store; only their progress is forwarded. A user deleting a message erases its content and file locally. Retried deliveries are dropped using an in-memory window of recent ids; Acknowledged events are processed one at a time in arrival order, and a clean shutdown (SIGINT, SIGTERM) finishes them first; a crash can still lose an event that was acknowledged but not yet processed.

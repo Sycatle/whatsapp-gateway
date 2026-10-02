@@ -91,7 +91,7 @@ loginctl enable-linger "$USER"      # keep running after logout and across reboo
 journalctl --user -u whatsapp-gateway -f
 ```
 
-If you use `scripts/whisper-server.py`, give it its own unit the same way and add `After=whisper-server.service` to the handler's `[Unit]`.
+If you use `scripts/whisper-server.py`, give it its own unit the same way and add `After=whisper-server.service` to the gateway's `[Unit]`.
 
 If `npm` is not on systemd's `PATH` (version managers such as fnm), use the absolute path of `npm` in `ExecStart`. Do the same for `cloudflared` with a second unit.
 

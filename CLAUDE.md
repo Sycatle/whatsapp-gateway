@@ -12,13 +12,13 @@ Done = `npm run check && npm test` green.
 
 ## Code map (`src/`)
 
-- `index.ts` : entrypoint, listens on 127.0.0.1, graceful shutdown
+- `index.ts` : entrypoint, listens on 127.0.0.1; shutdown drains the pipeline (`app.shutdown()`) before closing the store
 - `config.ts` : env parsing; `graph` is set only when `WHATSAPP_ACCESS_TOKEN` is, `events` only with `EVENTS_URL`
 - `server.ts` : route table; `protectedRoute` / `sendingRoute` enforce 503 (not configured) and 401 (bad `API_KEY`); `router.ts` matches `:param` and `*`
 - `webhook.ts` : handshake and signed reception; `events.ts` normalizes every webhook field (messages, echoes, history, edits, revokes, statuses, contact sync, other fields), masks, dedups
-- `pipeline.ts` : after the 200: downloads media (`media.ts`), transcribes audio (`transcribe.ts`), writes `store.ts` (node:sqlite), forwards via `sink.ts`
+- `pipeline.ts` : after the 200, one event at a time in arrival order: downloads media (`media.ts`), transcribes audio (`transcribe.ts`), writes `store.ts` (node:sqlite), forwards via `sink.ts`; each step is isolated
 - `messages.ts` : `POST /messages`, `/media`, `/read`; `queries.ts` : `/conversations`, `/contacts`; `gateway.ts` : `/phone/*`, `/waba/*`
-- `graph.ts` : Graph API client; `auth.ts` : constant-time checks and signing; `http.ts` : body reading with size limit
+- `graph.ts` : Graph API client (every failure is a `GraphError`, which `server.ts` turns into 502/504: handlers do not catch it); `auth.ts` : constant-time checks and signing; `http.ts` : body reading with size limit
 
 ## Pitfalls
 
