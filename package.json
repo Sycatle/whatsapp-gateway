@@ -1,7 +1,11 @@
 {
-  "name": "wa-cloud-prototype",
+  "name": "whatsapp-handler",
+  "description": "Minimal WhatsApp Cloud API webhook receiver and sender in TypeScript, with no runtime dependencies.",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "tsx --env-file=.env src/server.ts",
     "check": "tsc --noEmit"
