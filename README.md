@@ -33,6 +33,10 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | `PORT` | Listening port, default `3000`. |
 | `META_APP_SECRET` | Required. Signature verification. |
 | `WHATSAPP_VERIFY_TOKEN` | Required. Shared secret for the handshake; choose it yourself. |
+| `WHATSAPP_ACCESS_TOKEN` | Optional. Enables sending. Temporary tokens expire after 24 h. |
+| `WHATSAPP_PHONE_NUMBER_ID` | Required with an access token. Sender number id. |
+| `API_KEY` | Required with an access token. Bearer key for the sending routes; choose a long random value. |
+| `GRAPH_API_VERSION` | Default `v25.0`. |
 
 ## Limits
 
