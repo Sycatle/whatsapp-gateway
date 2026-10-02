@@ -47,6 +47,26 @@ describe('pipeline', () => {
     assert.deepEqual([store.messages('1')[0]!.type, store.messages('1')[0]!.mediaPath], ['image', join(dir, '88.jpg')]);
   });
 
+  it('adds a transcript to voice notes and tolerates its absence', async () => {
+    mock.method(globalThis, 'fetch', async (url: string | URL | Request) =>
+      String(url).endsWith('/66')
+        ? new Response(JSON.stringify({ url: 'https://cdn.example/f', mime_type: 'audio/ogg; codecs=opus' }))
+        : new Response('ogg'));
+    const dir = await mkdtemp(join(tmpdir(), 'wa-'));
+    const store = openStore(':memory:');
+    const seen: string[] = [];
+    const transcribe = async (path: string) => { seen.push(path); return 'bonjour'; };
+    const voice = { id: 'a', from: '1', type: 'audio', audio: { id: '66', voice: true } };
+
+    await createPipeline({ downloadsDir: dir, store, graph, transcribe })(wrap({ messages: [voice] }));
+    assert.deepEqual(store.messages('1')[0]!.content, { id: '66', voice: true, transcript: 'bonjour' });
+    assert.deepEqual(seen, [join(dir, '66.ogg')]);
+
+    await createPipeline({ downloadsDir: dir, store, graph, transcribe: async () => undefined })(wrap({ messages: [{ ...voice, id: 'b' }] }));
+    const second = store.messages('1').find((m) => m.id === 'b')!;
+    assert.equal((second.content as Record<string, unknown>).transcript, undefined);
+  });
+
   it('forwards the processed event without the history backlog', async () => {
     const forwarded: ParsedEvent[] = [];
     const process = createPipeline({ downloadsDir: '/nowhere', store: openStore(':memory:'), forward: (e) => forwarded.push(e) });

@@ -11,6 +11,15 @@ export interface EventsConfig {
   secret: string;
 }
 
+export interface TranscribeConfig {
+  /** Full URL of an OpenAI-compatible `/v1/audio/transcriptions` endpoint. */
+  url: string;
+  model: string;
+  apiKey?: string;
+  /** ISO 639-1 hint; detected automatically when absent. */
+  language?: string;
+}
+
 export interface Config {
   port: number;
   verifyToken: string;
@@ -19,6 +28,8 @@ export interface Config {
   dbPath: string;
   /** Bearer key for every route except the webhook and `/health`; those routes answer 503 without it. */
   apiKey?: string;
+  /** Speech-to-text for voice notes and audio; absent when not configured. */
+  transcribe?: TranscribeConfig;
   /** Where to forward processed events; absent when not configured. */
   events?: EventsConfig;
   /** Present only when sending is configured. */
@@ -41,6 +52,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     if (!eventsSecret) throw new Error('EVENTS_SECRET requis quand EVENTS_URL est défini');
     if (!/^https?:\/\//.test(eventsUrl)) throw new Error('EVENTS_URL doit commencer par http:// ou https://');
     config.events = { url: eventsUrl, secret: eventsSecret };
+  }
+
+  const { TRANSCRIBE_URL: transcribeUrl } = env;
+  if (transcribeUrl) {
+    if (!/^https?:\/\//.test(transcribeUrl)) throw new Error('TRANSCRIBE_URL doit commencer par http:// ou https://');
+    config.transcribe = { url: transcribeUrl, model: env.TRANSCRIBE_MODEL ?? 'whisper-1' };
+    if (env.TRANSCRIBE_API_KEY) config.transcribe.apiKey = env.TRANSCRIBE_API_KEY;
+    if (env.TRANSCRIBE_LANGUAGE) config.transcribe.language = env.TRANSCRIBE_LANGUAGE;
   }
 
   const { WHATSAPP_ACCESS_TOKEN: accessToken, WHATSAPP_PHONE_NUMBER_ID: phoneNumberId, API_KEY: apiKey } = env;

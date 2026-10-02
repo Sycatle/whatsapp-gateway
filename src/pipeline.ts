@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises';
 import type { ParsedEvent } from './events.js';
 import type { Graph } from './graph.js';
 import { saveMedia } from './media.js';
+import type { Transcriber } from './transcribe.js';
 import type { Store } from './store.js';
 
 export interface PipelineDeps {
@@ -9,6 +10,8 @@ export interface PipelineDeps {
   store: Store;
   /** Absent when sending is not configured: media cannot be downloaded without a token. */
   graph?: Graph;
+  /** Turns audio and voice notes into text, stored as `content.transcript`. */
+  transcribe?: Transcriber;
   /** Receives the processed event, with media paths filled in. */
   forward?: (event: ParsedEvent) => void;
 }
@@ -16,7 +19,7 @@ export interface PipelineDeps {
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** Applies an acknowledged webhook event: downloads media, then records everything. */
-export function createPipeline({ downloadsDir, store, graph, forward }: PipelineDeps) {
+export function createPipeline({ downloadsDir, store, graph, transcribe, forward }: PipelineDeps) {
   async function download(id: string, item: { type: string; content: Record<string, unknown> }): Promise<string | undefined> {
     if (!graph) return undefined;
     try {
@@ -34,7 +37,12 @@ export function createPipeline({ downloadsDir, store, graph, forward }: Pipeline
     // (last 14 days only) and are downloaded like any other.
     for (const message of event.messages) {
       const path = await download(message.id, message);
-      if (path) message.mediaPath = path;
+      if (!path) continue;
+      message.mediaPath = path;
+      if (transcribe && message.type === 'audio') {
+        const transcript = await transcribe(path, message.id);
+        if (transcript) message.content = { ...message.content, transcript };
+      }
     }
     store.saveMessages(event.messages);
 

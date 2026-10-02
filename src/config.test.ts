@@ -24,6 +24,14 @@ describe('loadConfig', () => {
     assert.deepEqual(loadConfig({ ...base, EVENTS_URL: 'https://app.example/e', EVENTS_SECRET: 's' }).events, { url: 'https://app.example/e', secret: 's' });
   });
 
+  it('configures transcription from a URL alone', () => {
+    assert.equal(loadConfig(base).transcribe, undefined);
+    assert.throws(() => loadConfig({ ...base, TRANSCRIBE_URL: 'localhost:8178' }));
+    assert.deepEqual(loadConfig({ ...base, TRANSCRIBE_URL: 'http://x/v1/audio/transcriptions' }).transcribe, { url: 'http://x/v1/audio/transcriptions', model: 'whisper-1' });
+    const full = loadConfig({ ...base, TRANSCRIBE_URL: 'https://x/t', TRANSCRIBE_MODEL: 'm', TRANSCRIBE_API_KEY: 'k', TRANSCRIBE_LANGUAGE: 'fr' });
+    assert.deepEqual(full.transcribe, { url: 'https://x/t', model: 'm', apiKey: 'k', language: 'fr' });
+  });
+
   it('requires phone number id and API key once an access token is set', () => {
     assert.throws(() => loadConfig({ ...base, WHATSAPP_ACCESS_TOKEN: 'a' }));
     const config = loadConfig({ ...base, WHATSAPP_ACCESS_TOKEN: 'a', WHATSAPP_PHONE_NUMBER_ID: 'p', API_KEY: 'k' });
