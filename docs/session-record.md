@@ -29,7 +29,7 @@ The source lives in the separate `sycode-v1` repository at `public/confidentiali
 
 Deployment copied only the new static file into the current site's `dist/client` directory and retained a copy in the VPS checkout's `public` directory. The site was not restarted; DNS, Cloudflare settings, and existing site routes were not changed. The privacy URL and homepage both returned HTTP 200.
 
-**Deployment limitation:** the live file was added to the running container, not to its immutable image. A container recreation from the old image can remove it. Include the source in the site's next normal image build and deployment. The change in the separate website repository has not been committed or pushed as part of this repository's publication.
+**Deployment limitation:** the live file was added to the running container, not to its immutable image. A container recreation from the old image can remove it. Include the source in the site's next normal image build and deployment. The website change was committed separately and submitted in the website repository's PR #61; that repository remains private. This public repository contains only the prototype and its documentation.
 
 ## Local operations
 
