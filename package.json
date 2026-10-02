@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-handler",
-  "description": "Minimal WhatsApp Cloud API webhook receiver and sender in TypeScript, with no runtime dependencies.",
+  "description": "WhatsApp Cloud API handler: signed webhook receiver, sender for every message type and local conversation store, with no runtime dependencies.",
   "private": true,
   "type": "module",
   "engines": {

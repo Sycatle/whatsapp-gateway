@@ -1,8 +1,11 @@
 # whatsapp-handler
 
-Minimal WhatsApp Cloud API webhook receiver in TypeScript. No runtime dependencies, no database.
+WhatsApp Cloud API handler in TypeScript: a signed webhook receiver, a sender for every message type, and a local store of conversations. No runtime dependencies.
 
-It verifies the Meta handshake, authenticates events with `X-Hub-Signature-256` over the raw body, and logs a one-line summary per message or status.
+- **Receives** every message type, edits, deletions, delivery statuses, history and contacts of a coexistence number, and downloads media.
+- **Keeps** messages, contacts and the 24 h window per chat in SQLite, queryable over HTTP.
+- **Forwards** each processed event to your own service, signed.
+- **Sends** text, media, voice notes, stickers, locations, contacts, buttons and lists, templates, reactions and quoted replies; marks messages read; reaches the rest of the Cloud API through a gateway.
 
 ## Run
 
