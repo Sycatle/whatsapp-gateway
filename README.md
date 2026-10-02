@@ -102,8 +102,22 @@ Paths and bodies are Meta's: see the [Cloud API reference](https://developers.fa
 | `GRAPH_API_VERSION` | Default `v25.0`. |
 | `EVENTS_URL` | Optional. Every processed event is POSTed there as JSON (`messages`, `statuses`, `edits`, `revokes`, `contacts`, `history`, `changes`), retried 3 times on failure. |
 | `EVENTS_SECRET` | Required with `EVENTS_URL`. Each POST carries `X-Hub-Signature-256: sha256=<HMAC of the body>` keyed with it, so you verify it exactly like Meta's. |
+| `TRANSCRIBE_URL` | Optional. OpenAI-compatible `/v1/audio/transcriptions` endpoint: voice notes and audio are transcribed into `content.transcript`. |
+| `TRANSCRIBE_MODEL`, `TRANSCRIBE_LANGUAGE`, `TRANSCRIBE_API_KEY` | Model name sent to the endpoint (default `whisper-1`), optional language hint (`fr`; detected otherwise), bearer key for hosted services. |
 | `DB_PATH` | SQLite file for messages, statuses and contacts, default `data/handler.db` (created with mode 600). |
 | `DOWNLOADS_DIR` | Where received media is saved, default `downloads`. Files are `<media id>.<ext>`, mode 600, capped at 100 MiB, checksum-verified. |
+
+## Voice transcription
+
+Any service speaking the OpenAI transcription protocol works (Groq, OpenAI, whisper.cpp's server, speaches). To stay local, `scripts/whisper-server.py` keeps a Whisper model loaded on the GPU between requests, so a voice note takes about half a second instead of reloading the model each time:
+
+```bash
+pip install openai-whisper                       # plus ffmpeg
+python3 scripts/whisper-server.py large-v3-turbo 8178   # model and port are optional
+# .env: TRANSCRIBE_URL=http://127.0.0.1:8178/v1/audio/transcriptions
+```
+
+`large-v3-turbo` needs about 5 GB of VRAM; use `small` on a smaller GPU or on CPU. The transcript is stored with the message and sent to `EVENTS_URL`. If the service is down, the message is still stored, just without a transcript.
 
 ## Not possible through the API
 

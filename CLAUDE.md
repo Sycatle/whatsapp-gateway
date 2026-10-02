@@ -1,6 +1,6 @@
 # whatsapp-handler
 
-WhatsApp Cloud API webhook receiver and sender. Node 22, TypeScript ESM, zero runtime dependencies, no database.
+WhatsApp Cloud API webhook receiver and sender. Node 22, TypeScript ESM, no runtime dependencies so far (not a rule), SQLite via node:sqlite.
 
 ## Commands
 
@@ -16,7 +16,7 @@ Done = `npm run check && npm test` green.
 - `config.ts` : env parsing; `graph` is set only when `WHATSAPP_ACCESS_TOKEN` is, `events` only with `EVENTS_URL`
 - `server.ts` : route table; `protectedRoute` / `sendingRoute` enforce 503 (not configured) and 401 (bad `API_KEY`); `router.ts` matches `:param` and `*`
 - `webhook.ts` : handshake and signed reception; `events.ts` normalizes every webhook field (messages, echoes, history, edits, revokes, statuses, contact sync, other fields), masks, dedups
-- `pipeline.ts` : after the 200: downloads media (`media.ts`), writes `store.ts` (node:sqlite), forwards via `sink.ts`
+- `pipeline.ts` : after the 200: downloads media (`media.ts`), transcribes audio (`transcribe.ts`), writes `store.ts` (node:sqlite), forwards via `sink.ts`
 - `messages.ts` : `POST /messages`, `/media`, `/read`; `queries.ts` : `/conversations`, `/contacts`; `gateway.ts` : `/phone/*`, `/waba/*`
 - `graph.ts` : Graph API client; `auth.ts` : constant-time checks and signing; `http.ts` : body reading with size limit
 
