@@ -5,7 +5,7 @@ import type { Graph } from './graph.js';
 
 const MAX_BYTES = 100 * 1024 * 1024;
 
-const MEDIA_TYPES = ['image', 'audio', 'document'];
+const MEDIA_TYPES = ['image', 'audio', 'video', 'document', 'sticker'];
 
 const EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -16,7 +16,16 @@ const EXTENSIONS: Record<string, string> = {
   'audio/mp4': 'm4a',
   'audio/aac': 'aac',
   'audio/amr': 'amr',
+  'video/mp4': 'mp4',
+  'video/3gpp': '3gp',
+  'text/plain': 'txt',
   'application/pdf': 'pdf',
+  'application/msword': 'doc',
+  'application/vnd.ms-excel': 'xls',
+  'application/vnd.ms-powerpoint': 'ppt',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
 };
 
 /** Saves the media attached to a message, if any, and returns its path. */

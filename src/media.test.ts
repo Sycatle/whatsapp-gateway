@@ -36,6 +36,15 @@ describe('saveMedia', () => {
     assert.equal((init.headers as Record<string, string>).Authorization, 'Bearer tok');
   });
 
+  it('handles videos and stickers as well', async () => {
+    for (const type of ['video', 'sticker']) {
+      stubGraph({});
+      const path = await saveMedia(graph, await mkdtemp(join(tmpdir(), 'wa-')), { type, content: { id: '555' } });
+      assert.ok(path?.endsWith('555.jpg'));
+      mock.restoreAll();
+    }
+  });
+
   it('rejects a checksum mismatch', async () => {
     stubGraph({ sha256: 'deadbeef' });
     const message = { type: 'image', content: { id: '555', mime_type: 'image/jpeg' } };
