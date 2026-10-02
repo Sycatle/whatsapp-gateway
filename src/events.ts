@@ -51,3 +51,24 @@ export function describe(event: ParsedEvent): string[] {
     ...event.statuses.map((s) => `status id=${s.id} to=${mask(s.recipient_id)} status=${s.status}`),
   ];
 }
+
+/** Remembers the most recent keys so retried deliveries can be dropped. */
+export class SeenKeys {
+  private keys = new Set<string>();
+  constructor(private max = 10_000) {}
+
+  /** Returns true the first time a key is seen. */
+  add(key: string): boolean {
+    if (this.keys.has(key)) return false;
+    this.keys.add(key);
+    if (this.keys.size > this.max) this.keys.delete(this.keys.values().next().value as string);
+    return true;
+  }
+}
+
+export function dropSeen(event: ParsedEvent, seen: SeenKeys): ParsedEvent {
+  return {
+    messages: event.messages.filter((m) => seen.add(`m:${m.id}`)),
+    statuses: event.statuses.filter((s) => seen.add(`s:${s.id}:${s.status}`)),
+  };
+}

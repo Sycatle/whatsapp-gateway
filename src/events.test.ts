@@ -1,6 +1,6 @@
 import { describe as suite, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { describe, parseEvent } from './events.js';
+import { describe, dropSeen, parseEvent, SeenKeys } from './events.js';
 
 const wrap = (value: object, field = 'messages') => ({ entry: [{ changes: [{ field, value }] }] });
 
@@ -27,5 +27,25 @@ suite('describe', () => {
       messages: [{ id: 'wamid.1', from: '33612345678', type: 'text', text: { body: 'secret' } }],
     })));
     assert.deepEqual(lines, ['message id=wamid.1 from=***5678 type=text']);
+  });
+});
+
+suite('dropSeen', () => {
+  const event = () => parseEvent(wrap({
+    messages: [{ id: 'wamid.1', from: '1', type: 'text' }],
+    statuses: [{ id: 'wamid.2', status: 'read', recipient_id: '1' }],
+  }));
+
+  it('drops retried messages and statuses', () => {
+    const seen = new SeenKeys();
+    assert.equal(dropSeen(event(), seen).messages.length, 1);
+    const retry = dropSeen(event(), seen);
+    assert.deepEqual(retry, { messages: [], statuses: [] });
+  });
+
+  it('forgets the oldest key beyond its capacity', () => {
+    const seen = new SeenKeys(2);
+    assert.ok(seen.add('a') && seen.add('b') && seen.add('c'));
+    assert.ok(seen.add('a'));
   });
 });

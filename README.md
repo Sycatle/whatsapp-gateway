@@ -36,4 +36,4 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 
 ## Limits
 
-Events are not persisted or deduplicated: a crash loses unprocessed work, and Meta may retry deliveries. Logs hold no message content, but downloaded files can contain personal data; keep them private.
+Retried deliveries are dropped using an in-memory window of recent ids. Nothing is persisted: a crash or restart loses unprocessed work. Logs hold no message content, but downloaded files can contain personal data; keep them private.

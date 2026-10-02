@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { safeEqual, verifySignature } from './auth.js';
 import type { Config } from './config.js';
-import { describe, parseEvent } from './events.js';
+import { describe, dropSeen, parseEvent, type SeenKeys } from './events.js';
 
 const MAX_BODY = 1024 * 1024;
 
@@ -13,7 +13,7 @@ export function verifyHandshake(url: URL, res: ServerResponse, config: Config): 
   if (valid) console.log('Webhook vérifié par Meta');
 }
 
-export async function receiveEvent(req: IncomingMessage, res: ServerResponse, config: Config): Promise<void> {
+export async function receiveEvent(req: IncomingMessage, res: ServerResponse, config: Config, seen: SeenKeys): Promise<void> {
   try {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -30,7 +30,7 @@ export async function receiveEvent(req: IncomingMessage, res: ServerResponse, co
       res.writeHead(403).end('Invalid signature');
       return;
     }
-    const event = parseEvent(JSON.parse(body.toString()));
+    const event = dropSeen(parseEvent(JSON.parse(body.toString())), seen);
     res.writeHead(200).end('EVENT_RECEIVED');
     for (const line of describe(event)) console.log(line);
   } catch (error) {
