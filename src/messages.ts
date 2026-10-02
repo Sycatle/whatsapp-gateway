@@ -150,3 +150,25 @@ export async function sendMessage(req: IncomingMessage, res: ServerResponse, dep
 
   await deliver(deps, res, { chat: (to ?? group) as string, group: group !== undefined }, type, content, replyTo);
 }
+
+/** `POST /read` with `{ message_id, typing? }`: read receipt for a received message, optionally with "typing...". */
+export async function markRead(req: IncomingMessage, res: ServerResponse, graph: Graph): Promise<void> {
+  const raw = await readBody(req, res, MAX_JSON);
+  if (!raw) return;
+  let input: { message_id?: unknown; typing?: unknown };
+  try {
+    input = JSON.parse(raw.toString());
+  } catch {
+    return sendJson(res, 400, { error: 'Body must be JSON' });
+  }
+  if (typeof input?.message_id !== 'string' || !input.message_id) {
+    return sendJson(res, 400, { error: '"message_id" must be the id of a received message' });
+  }
+  try {
+    await graph.markRead(input.message_id, input.typing === true);
+    sendJson(res, 200, { ok: true });
+  } catch (error) {
+    if (!(error instanceof GraphError)) throw error;
+    sendJson(res, 502, { error: error.message, code: error.code });
+  }
+}

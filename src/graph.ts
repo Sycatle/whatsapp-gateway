@@ -36,6 +36,19 @@ export function createGraph(config: GraphConfig) {
       const { messages } = (await res.json()) as { messages: { id: string }[] };
       return messages[0]!.id;
     },
+    /** Marks an inbound message as read, optionally showing the typing indicator for up to 25 seconds. */
+    async markRead(messageId: string, typing = false): Promise<void> {
+      await request(`${config.phoneNumberId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          status: 'read',
+          message_id: messageId,
+          ...(typing && { typing_indicator: { type: 'text' } }),
+        }),
+      });
+    },
     /** Uploads a file and returns its media id. */
     async upload(bytes: Buffer<ArrayBuffer>, mimeType: string, filename: string): Promise<string> {
       const form = new FormData();

@@ -117,6 +117,35 @@ describe('POST /messages', () => {
     });
   });
 
+  describe('POST /read', () => {
+    const read = (body: unknown) => realFetch(`${base}/read`, { method: 'POST', body: JSON.stringify(body), headers: { Authorization: 'Bearer key' } });
+    const capture = () => {
+      const calls: Record<string, unknown>[] = [];
+      mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).startsWith(base)) return realFetch(url, init);
+        calls.push(JSON.parse(init!.body as string));
+        return new Response(JSON.stringify({ success: true }));
+      });
+      return calls;
+    };
+
+    it('marks a message as read', async () => {
+      const calls = capture();
+      assert.equal((await read({ message_id: 'wamid.in' })).status, 200);
+      assert.deepEqual(calls[0], { messaging_product: 'whatsapp', status: 'read', message_id: 'wamid.in' });
+    });
+
+    it('can show the typing indicator', async () => {
+      const calls = capture();
+      await read({ message_id: 'wamid.in', typing: true });
+      assert.deepEqual(calls[0]!.typing_indicator, { type: 'text' });
+    });
+
+    it('requires a message id', async () => {
+      assert.equal((await read({})).status, 400);
+    });
+  });
+
   it('reports Graph failures as 502', async () => {
     mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) =>
       String(url).startsWith(base)

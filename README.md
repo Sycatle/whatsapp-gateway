@@ -30,6 +30,7 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | DELETE | `/conversations/:chat` | Erases the chat's messages, contact entry and downloaded files. Same auth. |
 | GET | `/contacts` | Known contacts (address-book and profile names). Same auth. |
 | POST | `/messages` | Sends any message type. Same auth. 503 if sending is not configured. |
+| POST | `/read` | `{"message_id":"wamid...","typing":true}`: marks a received message as read (blue ticks) and optionally shows "typing..." until you reply or 25 s pass. Same auth. |
 | POST | `/media` | Uploads the body and sends it as image, audio or document. Same auth. |
 
 `POST /messages` takes JSON: a recipient (`to`: digits only, international format, or `group`), a `type` (default `text`) and the Cloud API object of that type. Optional `reply_to` (a message id) quotes a message.

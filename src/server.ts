@@ -4,7 +4,7 @@ import type { Config } from './config.js';
 import { SeenKeys, type ParsedEvent } from './events.js';
 import { createGraph, type Graph } from './graph.js';
 import { sendJson } from './http.js';
-import { sendMedia, sendMessage } from './messages.js';
+import { markRead, sendMedia, sendMessage } from './messages.js';
 import { createPipeline } from './pipeline.js';
 import { deleteConversation, listContacts, listConversations, listMessages } from './queries.js';
 import { createRouter, type Context, type Handler } from './router.js';
@@ -51,6 +51,7 @@ export function createApp(config: Config): Server {
     'DELETE /conversations/:chat': protectedRoute((ctx) => deleteConversation(ctx, store)),
     'GET /contacts': protectedRoute((ctx) => listContacts(ctx, store)),
     'POST /messages': sendingRoute(({ req, res }, g) => sendMessage(req, res, { graph: g, store })),
+    'POST /read': sendingRoute(({ req, res }, g) => markRead(req, res, g)),
     'POST /media': sendingRoute(({ req, res }, g) => sendMedia(req, res, { graph: g, store })),
   });
 
