@@ -24,7 +24,7 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | --- | --- | --- |
 | GET | `/health` | `{"ok":true}` |
 | GET | `/webhook` | Meta verification handshake. |
-| POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per message or status (phone masked, no content). Bodies over 1 MiB get 413. |
+| POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per message or status (phone masked, no content). With sending configured, also saves received images, audio, voice notes and documents to `DOWNLOADS_DIR`. Bodies over 1 MiB get 413. |
 | POST | `/messages` | Sends a text. Requires `Authorization: Bearer $API_KEY`. 503 if sending is not configured. |
 
 ```bash
@@ -46,6 +46,7 @@ curl -X POST http://127.0.0.1:3000/messages \
 | `WHATSAPP_PHONE_NUMBER_ID` | Required with an access token. Sender number id. |
 | `API_KEY` | Required with an access token. Bearer key for the sending routes; choose a long random value. |
 | `GRAPH_API_VERSION` | Default `v25.0`. |
+| `DOWNLOADS_DIR` | Where received media is saved, default `downloads`. Files are `<media id>.<ext>`, mode 600, capped at 100 MiB, checksum-verified. |
 
 ## Limits
 

@@ -9,6 +9,7 @@ export interface Config {
   port: number;
   verifyToken: string;
   appSecret: string;
+  downloadsDir: string;
   /** Present only when sending is configured. */
   graph?: GraphConfig;
 }
@@ -16,7 +17,12 @@ export interface Config {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const { WHATSAPP_VERIFY_TOKEN: verifyToken, META_APP_SECRET: appSecret } = env;
   if (!verifyToken || !appSecret) throw new Error('WHATSAPP_VERIFY_TOKEN et META_APP_SECRET requis');
-  const config: Config = { port: Number(env.PORT ?? 3000), verifyToken, appSecret };
+  const config: Config = {
+    port: Number(env.PORT ?? 3000),
+    verifyToken,
+    appSecret,
+    downloadsDir: env.DOWNLOADS_DIR ?? 'downloads',
+  };
 
   const { WHATSAPP_ACCESS_TOKEN: accessToken, WHATSAPP_PHONE_NUMBER_ID: phoneNumberId, API_KEY: apiKey } = env;
   if (accessToken) {

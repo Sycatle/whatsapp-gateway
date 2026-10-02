@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { GraphConfig } from './config.js';
 
 export class GraphError extends Error {
@@ -12,7 +13,7 @@ export function createGraph(config: GraphConfig) {
   const base = `https://graph.facebook.com/${config.version}`;
 
   async function request(path: string, init: RequestInit = {}): Promise<Response> {
-    const res = await fetch(`${base}/${path}`, {
+    const res = await fetch(path.startsWith('https://') ? path : `${base}/${path}`, {
       ...init,
       headers: { Authorization: `Bearer ${config.accessToken}`, ...init.headers },
     });
@@ -34,6 +35,19 @@ export function createGraph(config: GraphConfig) {
       });
       const { messages } = (await res.json()) as { messages: { id: string }[] };
       return messages[0]!.id;
+    },
+    /** Downloads a received media file, refusing anything above `maxBytes` or with a wrong checksum. */
+    async download(mediaId: string, maxBytes: number): Promise<{ bytes: Buffer; mimeType: string }> {
+      const info = (await (await request(mediaId)).json()) as {
+        url: string; mime_type: string; sha256?: string; file_size?: number;
+      };
+      if ((info.file_size ?? 0) > maxBytes) throw new Error(`Media ${mediaId} is larger than ${maxBytes} bytes`);
+      const bytes = Buffer.from(await (await request(info.url)).arrayBuffer());
+      if (bytes.length > maxBytes) throw new Error(`Media ${mediaId} is larger than ${maxBytes} bytes`);
+      if (info.sha256 && createHash('sha256').update(bytes).digest('hex') !== info.sha256) {
+        throw new Error(`Media ${mediaId} failed its checksum`);
+      }
+      return { bytes, mimeType: info.mime_type };
     },
     request,
   };
