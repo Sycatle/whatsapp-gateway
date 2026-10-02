@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { access, mkdtemp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseEvent } from './events.js';
+import { parseEvent, type ParsedEvent } from './events.js';
 import { createGraph } from './graph.js';
 import { createPipeline } from './pipeline.js';
 import { openStore } from './store.js';
@@ -29,6 +29,15 @@ describe('pipeline', () => {
 
     await process(wrap({ statuses: [{ id: 'v', status: 'read', recipient_id: '1' }] }));
     assert.equal(store.messages('1')[0]!.status, 'read');
+  });
+
+  it('forwards the processed event without the history backlog', async () => {
+    const forwarded: ParsedEvent[] = [];
+    const process = createPipeline({ downloadsDir: '/nowhere', store: openStore(':memory:'), forward: (e) => forwarded.push(e) });
+    await process(wrap({
+      history: [{ metadata: { progress: 10 }, threads: [{ id: '1', messages: [{ id: 'h', from: '1', type: 'text', text: {} }] }] }],
+    }, 'history'));
+    assert.deepEqual([forwarded[0]!.messages, forwarded[0]!.history], [[], [{ progress: 10, messages: 1 }]]);
   });
 
   it('still records a message whose media download fails', async () => {

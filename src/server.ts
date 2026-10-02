@@ -6,6 +6,7 @@ import { createGraph, type Graph } from './graph.js';
 import { sendJson } from './http.js';
 import { sendMedia, sendText } from './messages.js';
 import { createPipeline } from './pipeline.js';
+import { createSink } from './sink.js';
 import { openStore } from './store.js';
 import { receiveEvent, verifyHandshake } from './webhook.js';
 
@@ -14,7 +15,7 @@ export function createApp(config: Config): Server {
   const graph = config.graph && createGraph(config.graph);
   const store = openStore(config.dbPath);
 
-  const pipeline = createPipeline({ downloadsDir: config.downloadsDir, store, graph });
+  const pipeline = createPipeline({ downloadsDir: config.downloadsDir, store, graph, forward: createSink(config.events) });
   const handleEvent = (event: ParsedEvent) => {
     pipeline(event).catch((error) => console.error('event processing failed:', error instanceof Error ? error.message : error));
   };

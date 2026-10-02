@@ -54,9 +54,11 @@ curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
 | `WHATSAPP_PHONE_NUMBER_ID` | Required with an access token. Sender number id. |
 | `API_KEY` | Required with an access token. Bearer key for the sending routes; choose a long random value. |
 | `GRAPH_API_VERSION` | Default `v25.0`. |
+| `EVENTS_URL` | Optional. Every processed event is POSTed there as JSON (`messages`, `statuses`, `edits`, `revokes`, `contacts`, `history`, `changes`), retried 3 times on failure. |
+| `EVENTS_SECRET` | Required with `EVENTS_URL`. Each POST carries `X-Hub-Signature-256: sha256=<HMAC of the body>` keyed with it, so you verify it exactly like Meta's. |
 | `DB_PATH` | SQLite file for messages, statuses and contacts, default `data/handler.db` (created with mode 600). |
 | `DOWNLOADS_DIR` | Where received media is saved, default `downloads`. Files are `<media id>.<ext>`, mode 600, capped at 100 MiB, checksum-verified. |
 
 ## Limits
 
-Messages, contacts and delivery statuses are kept in a local SQLite file (`node:sqlite`, experimental in Node 22, no dependency). It and `DOWNLOADS_DIR` hold personal data: keep them private and back them up as such. Message content never goes to the logs. A user deleting a message erases its content and file locally. Retried deliveries are dropped using an in-memory window of recent ids; a crash can still lose an event that was acknowledged but not yet processed.
+Messages, contacts and delivery statuses are kept in a local SQLite file (`node:sqlite`, experimental in Node 22, no dependency). It and `DOWNLOADS_DIR` hold personal data: keep them private and back them up as such. Message content never goes to the logs, but it does go to `EVENTS_URL`: use HTTPS. History messages stay in the store; only their progress is forwarded. A user deleting a message erases its content and file locally. Retried deliveries are dropped using an in-memory window of recent ids; a crash can still lose an event that was acknowledged but not yet processed.

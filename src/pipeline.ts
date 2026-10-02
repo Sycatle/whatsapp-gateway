@@ -9,12 +9,14 @@ export interface PipelineDeps {
   store: Store;
   /** Absent when sending is not configured: media cannot be downloaded without a token. */
   graph?: Graph;
+  /** Receives the processed event, with media paths filled in. */
+  forward?: (event: ParsedEvent) => void;
 }
 
 const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
 
 /** Applies an acknowledged webhook event: downloads media, then records everything. */
-export function createPipeline({ downloadsDir, store, graph }: PipelineDeps) {
+export function createPipeline({ downloadsDir, store, graph, forward }: PipelineDeps) {
   async function download(id: string, item: { type: string; content: Record<string, unknown> }): Promise<string | undefined> {
     if (!graph) return undefined;
     try {
@@ -47,6 +49,9 @@ export function createPipeline({ downloadsDir, store, graph }: PipelineDeps) {
     }
     for (const status of event.statuses) store.applyStatus(status);
     for (const contact of event.contacts) store.syncContact(contact);
+
+    // The history backlog can hold thousands of messages: it stays in the store and only its progress is forwarded.
+    forward?.({ ...event, messages: event.messages.filter((m) => m.source !== 'history') });
   };
 }
 

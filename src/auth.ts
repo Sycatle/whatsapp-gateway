@@ -6,9 +6,13 @@ export function safeEqual(a: string, b: string): boolean {
   return timingSafeEqual(digest(a), digest(b));
 }
 
+/** `sha256=<hex>`, the format of Meta's `X-Hub-Signature-256` header. */
+export function sign(body: string | Buffer, secret: string): string {
+  return `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`;
+}
+
 export function verifySignature(body: Buffer, header: string | undefined, appSecret: string): boolean {
-  const expected = `sha256=${createHmac('sha256', appSecret).update(body).digest('hex')}`;
-  return safeEqual(header ?? '', expected);
+  return safeEqual(header ?? '', sign(body, appSecret));
 }
 
 export function hasBearer(header: string | undefined, apiKey: string): boolean {
