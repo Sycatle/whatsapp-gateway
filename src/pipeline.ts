@@ -30,9 +30,9 @@ export function createPipeline({ downloadsDir, store, graph, forward }: Pipeline
   }
 
   return async function process(event: ParsedEvent): Promise<void> {
-    // History carries no media ids; its media arrives later as separate messages.
+    // History first lists media as placeholders without ids; the real messages follow in later webhooks
+    // (last 14 days only) and are downloaded like any other.
     for (const message of event.messages) {
-      if (message.source === 'history') continue;
       const path = await download(message.id, message);
       if (path) message.mediaPath = path;
     }

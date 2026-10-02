@@ -31,6 +31,22 @@ describe('pipeline', () => {
     assert.equal(store.messages('1')[0]!.status, 'read');
   });
 
+  it('downloads media that arrives later in the history sync', async () => {
+    mock.method(globalThis, 'fetch', async (url: string | URL | Request) =>
+      String(url).endsWith('/88')
+        ? new Response(JSON.stringify({ url: 'https://cdn.example/f', mime_type: 'image/jpeg' }))
+        : new Response('bytes'));
+    const dir = await mkdtemp(join(tmpdir(), 'wa-'));
+    const store = openStore(':memory:');
+    const process = createPipeline({ downloadsDir: dir, store, graph });
+    const history = (message: object) => wrap({ history: [{ threads: [{ id: '1', messages: [message] }] }] }, 'history');
+
+    await process(history({ id: 'h', from: '1', type: 'media_placeholder' }));
+    await process(history({ id: 'h', from: '1', type: 'image', image: { id: '88' } }));
+    assert.deepEqual(await readdir(dir), ['88.jpg']);
+    assert.deepEqual([store.messages('1')[0]!.type, store.messages('1')[0]!.mediaPath], ['image', join(dir, '88.jpg')]);
+  });
+
   it('forwards the processed event without the history backlog', async () => {
     const forwarded: ParsedEvent[] = [];
     const process = createPipeline({ downloadsDir: '/nowhere', store: openStore(':memory:'), forward: (e) => forwarded.push(e) });
