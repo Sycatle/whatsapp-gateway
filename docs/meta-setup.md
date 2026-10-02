@@ -22,7 +22,7 @@ In **Configure Webhooks**, set the callback URL to `https://<host>/webhook` and 
 
 ## Two subscriptions are required
 
-1. Subscribe the webhook to the `messages` field (incoming messages and delivery statuses).
+1. Subscribe the webhook to the `messages` field (incoming messages, edits, deletions and delivery statuses). Add `smb_message_echoes`, `history`, `smb_app_state_sync` and `account_update` for coexistence (below). Template status, quality and call fields are forwarded untouched, subscribe to them if you want them.
 2. Subscribe the **app to the WhatsApp Business Account**. The field subscription alone delivered no real messages.
 
 ```bash
@@ -33,6 +33,31 @@ curl --fail-with-body -X POST -H "$H" "$U"    # subscribe it if not
 ```
 
 A permissions error means the wrong app token, missing scopes, or the wrong WABA.
+
+## Use your own WhatsApp Business number (coexistence)
+
+Meta's "coexistence" lets one number work in the WhatsApp Business app on your phone and through this server at once. Messages are mirrored both ways: what you type in the app reaches `EVENTS_URL` and the store (`source: "app"`), and what the API sends shows in the app.
+
+What it takes (from Meta's documentation, June 2026; not testable with the test number):
+
+- WhatsApp **Business** app 2.24.17 or later on the number.
+- Onboarding through **Embedded Signup** with the `whatsapp_business_app_onboarding` feature type, which Meta reserves to Tech Providers and Solution Partners. Your Meta app therefore needs business verification and app review first. Skip phone registration: the number is already registered.
+- Within **24 hours** of onboarding, request the sync once (a second try needs a new onboarding):
+
+```bash
+S='{"messaging_product":"whatsapp","sync_type":"%s"}'
+curl -X POST -H "Authorization: Bearer $API_KEY" -d "$(printf "$S" smb_app_state_sync)" http://127.0.0.1:3000/phone/smb_app_data
+curl -X POST -H "Authorization: Bearer $API_KEY" -d "$(printf "$S" history)" http://127.0.0.1:3000/phone/smb_app_data
+```
+
+Contacts and up to 180 days of 1:1 history then arrive as webhooks (media of the last 14 days only), land in the store, and show up in `/conversations`. Check the link with `GET /phone?fields=is_on_biz_app,platform_type` (`true` and `CLOUD_API`).
+
+Differences to expect:
+
+- Not supported in coexistence: groups, calls, status, catalog, labels and quick replies, broadcast lists (read-only), disappearing and view-once messages, live location, business profile edits through the API. Linked devices are all unlinked at onboarding (re-link them; WhatsApp for Windows is unsupported).
+- Messages sent from the app are free and ignore the 24-hour window; API messages follow it and Cloud API pricing. A user message received just before onboarding opened no window: reply with a template.
+- Throughput is fixed at 20 messages per second. Users on an unsupported companion device can reach you without triggering a webhook.
+- Disconnecting in the app (Settings, Account, Business Platform) sends an `account_update` with `PARTNER_REMOVED`, which shows up in `changes`.
 
 ## Check real delivery
 
