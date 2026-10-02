@@ -4,22 +4,19 @@ import type { Config } from './config.js';
 import { SeenKeys, type ParsedEvent } from './events.js';
 import { createGraph, type Graph } from './graph.js';
 import { sendJson } from './http.js';
-import { saveMedia } from './media.js';
 import { sendMedia, sendText } from './messages.js';
+import { createPipeline } from './pipeline.js';
+import { openStore } from './store.js';
 import { receiveEvent, verifyHandshake } from './webhook.js';
 
 export function createApp(config: Config): Server {
   const seen = new SeenKeys();
   const graph = config.graph && createGraph(config.graph);
+  const store = openStore(config.dbPath);
 
-  /** Runs after the webhook was acknowledged; failures are logged, never thrown. */
+  const pipeline = createPipeline({ downloadsDir: config.downloadsDir, store, graph });
   const handleEvent = (event: ParsedEvent) => {
-    if (!graph) return;
-    for (const message of event.messages) {
-      saveMedia(graph, config.downloadsDir, message)
-        .then((path) => path && console.log(`media saved id=${message.id} path=${path}`))
-        .catch((error) => console.error(`media failed id=${message.id}: ${error instanceof Error ? error.message : error}`));
-    }
+    pipeline(event).catch((error) => console.error('event processing failed:', error instanceof Error ? error.message : error));
   };
 
   /** Runs a sending route only for a configured server and an authorized caller. */
@@ -38,7 +35,7 @@ export function createApp(config: Config): Server {
     'POST /media': protectedRoute(sendMedia),
   };
 
-  return createServer(async (req, res) => {
+  const server = createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const route = routes[`${req.method} ${url.pathname}`];
     try {
@@ -49,4 +46,6 @@ export function createApp(config: Config): Server {
       if (!res.headersSent) sendJson(res, 500, { error: 'Internal error' });
     }
   });
+  server.on('close', () => store.close());
+  return server;
 }

@@ -5,7 +5,7 @@ import type { Server } from 'node:http';
 import { createApp } from './server.js';
 
 const graph = { accessToken: 'tok', phoneNumberId: '123', version: 'v25.0', apiKey: 'key' };
-const open = { port: 0, verifyToken: 'v', appSecret: 's', downloadsDir: 'downloads' };
+const open = { port: 0, verifyToken: 'v', appSecret: 's', downloadsDir: 'downloads', dbPath: ':memory:' };
 
 async function listen(server: Server): Promise<string> {
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));

@@ -1,0 +1,53 @@
+import { rm } from 'node:fs/promises';
+import type { ParsedEvent } from './events.js';
+import type { Graph } from './graph.js';
+import { saveMedia } from './media.js';
+import type { Store } from './store.js';
+
+export interface PipelineDeps {
+  downloadsDir: string;
+  store: Store;
+  /** Absent when sending is not configured: media cannot be downloaded without a token. */
+  graph?: Graph;
+}
+
+const reason = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
+/** Applies an acknowledged webhook event: downloads media, then records everything. */
+export function createPipeline({ downloadsDir, store, graph }: PipelineDeps) {
+  async function download(id: string, item: { type: string; content: Record<string, unknown> }): Promise<string | undefined> {
+    if (!graph) return undefined;
+    try {
+      const path = await saveMedia(graph, downloadsDir, item);
+      if (path) console.log(`media saved id=${id} path=${path}`);
+      return path ?? undefined;
+    } catch (error) {
+      console.error(`media failed id=${id}: ${reason(error)}`);
+      return undefined;
+    }
+  }
+
+  return async function process(event: ParsedEvent): Promise<void> {
+    // History carries no media ids; its media arrives later as separate messages.
+    for (const message of event.messages) {
+      if (message.source === 'history') continue;
+      const path = await download(message.id, message);
+      if (path) message.mediaPath = path;
+    }
+    store.saveMessages(event.messages);
+
+    for (const edit of event.edits) {
+      store.applyEdit(edit);
+      const path = await download(edit.id, edit);
+      if (path) store.setMediaPath(edit.id, path);
+    }
+    for (const revoke of event.revokes) {
+      const path = store.applyRevoke(revoke);
+      if (path) await rm(path, { force: true });
+    }
+    for (const status of event.statuses) store.applyStatus(status);
+    for (const contact of event.contacts) store.syncContact(contact);
+  };
+}
+
+export type Pipeline = ReturnType<typeof createPipeline>;

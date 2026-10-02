@@ -10,6 +10,7 @@ export interface Config {
   verifyToken: string;
   appSecret: string;
   downloadsDir: string;
+  dbPath: string;
   /** Present only when sending is configured. */
   graph?: GraphConfig;
 }
@@ -22,6 +23,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     verifyToken,
     appSecret,
     downloadsDir: env.DOWNLOADS_DIR ?? 'downloads',
+    dbPath: env.DB_PATH ?? 'data/handler.db',
   };
 
   const { WHATSAPP_ACCESS_TOKEN: accessToken, WHATSAPP_PHONE_NUMBER_ID: phoneNumberId, API_KEY: apiKey } = env;

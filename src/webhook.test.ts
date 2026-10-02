@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createApp } from './server.js';
 
-const config = { port: 0, verifyToken: 'verify', appSecret: 'secret', downloadsDir: 'downloads' };
+const config = { port: 0, verifyToken: 'verify', appSecret: 'secret', downloadsDir: 'downloads', dbPath: ':memory:' };
 const sign = (body: string) => `sha256=${createHmac('sha256', config.appSecret).update(body).digest('hex')}`;
 
 let server: Server;

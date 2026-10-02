@@ -54,8 +54,9 @@ curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
 | `WHATSAPP_PHONE_NUMBER_ID` | Required with an access token. Sender number id. |
 | `API_KEY` | Required with an access token. Bearer key for the sending routes; choose a long random value. |
 | `GRAPH_API_VERSION` | Default `v25.0`. |
+| `DB_PATH` | SQLite file for messages, statuses and contacts, default `data/handler.db` (created with mode 600). |
 | `DOWNLOADS_DIR` | Where received media is saved, default `downloads`. Files are `<media id>.<ext>`, mode 600, capped at 100 MiB, checksum-verified. |
 
 ## Limits
 
-Retried deliveries are dropped using an in-memory window of recent ids. Nothing is persisted: a crash or restart loses unprocessed work. Logs hold no message content, but downloaded files can contain personal data; keep them private.
+Messages, contacts and delivery statuses are kept in a local SQLite file (`node:sqlite`, experimental in Node 22, no dependency). It and `DOWNLOADS_DIR` hold personal data: keep them private and back them up as such. Message content never goes to the logs. A user deleting a message erases its content and file locally. Retried deliveries are dropped using an in-memory window of recent ids; a crash can still lose an event that was acknowledged but not yet processed.
