@@ -12,7 +12,7 @@ export function verifyHandshake(url: URL, res: ServerResponse, config: Config): 
     && safeEqual(url.searchParams.get('hub.verify_token') ?? '', config.verifyToken);
   res.writeHead(valid ? 200 : 403, { 'Content-Type': 'text/plain' });
   res.end(valid ? url.searchParams.get('hub.challenge') ?? '' : 'Forbidden');
-  if (valid) console.log('Webhook vérifié par Meta');
+  if (valid) console.log('Webhook verified by Meta');
 }
 
 export async function receiveEvent(req: IncomingMessage, res: ServerResponse, config: Config,
@@ -31,7 +31,7 @@ export async function receiveEvent(req: IncomingMessage, res: ServerResponse, co
     for (const line of describe(event)) console.log(line);
     onEvent(event);
   } catch (error) {
-    console.error(error);
+    console.error(`webhook rejected: ${error instanceof Error ? error.message : error}`);
     if (!res.headersSent) res.writeHead(400).end('Invalid request');
   }
 }

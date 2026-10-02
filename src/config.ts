@@ -36,28 +36,41 @@ export interface Config {
   graph?: GraphConfig;
 }
 
+function httpUrl(name: string, value: string): string {
+  try {
+    if (/^https?:$/.test(new URL(value).protocol)) return value;
+  } catch {
+    // reported below
+  }
+  throw new Error(`${name} must be a valid http:// or https:// URL`);
+}
+
+function parsePort(value: string | undefined): number {
+  const port = value === undefined || value === '' ? 3000 : Number(value);
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('PORT must be an integer between 0 and 65535');
+  return port;
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const { WHATSAPP_VERIFY_TOKEN: verifyToken, META_APP_SECRET: appSecret } = env;
-  if (!verifyToken || !appSecret) throw new Error('WHATSAPP_VERIFY_TOKEN et META_APP_SECRET requis');
+  if (!verifyToken || !appSecret) throw new Error('WHATSAPP_VERIFY_TOKEN and META_APP_SECRET are required');
   const config: Config = {
-    port: Number(env.PORT ?? 3000),
+    port: parsePort(env.PORT),
     verifyToken,
     appSecret,
     downloadsDir: env.DOWNLOADS_DIR ?? 'downloads',
-    dbPath: env.DB_PATH ?? 'data/handler.db',
+    dbPath: env.DB_PATH ?? 'data/gateway.db',
   };
 
   const { EVENTS_URL: eventsUrl, EVENTS_SECRET: eventsSecret } = env;
   if (eventsUrl) {
-    if (!eventsSecret) throw new Error('EVENTS_SECRET requis quand EVENTS_URL est défini');
-    if (!/^https?:\/\//.test(eventsUrl)) throw new Error('EVENTS_URL doit commencer par http:// ou https://');
-    config.events = { url: eventsUrl, secret: eventsSecret };
+    if (!eventsSecret) throw new Error('EVENTS_SECRET is required when EVENTS_URL is set');
+    config.events = { url: httpUrl('EVENTS_URL', eventsUrl), secret: eventsSecret };
   }
 
   const { TRANSCRIBE_URL: transcribeUrl } = env;
   if (transcribeUrl) {
-    if (!/^https?:\/\//.test(transcribeUrl)) throw new Error('TRANSCRIBE_URL doit commencer par http:// ou https://');
-    config.transcribe = { url: transcribeUrl, model: env.TRANSCRIBE_MODEL ?? 'whisper-1' };
+    config.transcribe = { url: httpUrl('TRANSCRIBE_URL', transcribeUrl), model: env.TRANSCRIBE_MODEL ?? 'whisper-1' };
     if (env.TRANSCRIBE_API_KEY) config.transcribe.apiKey = env.TRANSCRIBE_API_KEY;
     if (env.TRANSCRIBE_LANGUAGE) config.transcribe.language = env.TRANSCRIBE_LANGUAGE;
   }
@@ -66,7 +79,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (apiKey) config.apiKey = apiKey;
   if (accessToken) {
     if (!phoneNumberId || !apiKey) {
-      throw new Error('WHATSAPP_PHONE_NUMBER_ID et API_KEY requis quand WHATSAPP_ACCESS_TOKEN est défini');
+      throw new Error('WHATSAPP_PHONE_NUMBER_ID and API_KEY are required when WHATSAPP_ACCESS_TOKEN is set');
     }
     config.graph = { accessToken, phoneNumberId, version: env.GRAPH_API_VERSION ?? 'v25.0' };
     if (env.WHATSAPP_BUSINESS_ACCOUNT_ID) config.graph.businessAccountId = env.WHATSAPP_BUSINESS_ACCOUNT_ID;

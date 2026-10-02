@@ -9,6 +9,12 @@ describe('loadConfig', () => {
     assert.throws(() => loadConfig({}));
   });
 
+  it('validates the port', () => {
+    assert.equal(loadConfig(base).port, 3000);
+    assert.equal(loadConfig({ ...base, PORT: '8080' }).port, 8080);
+    for (const PORT of ['abc', '-1', '70000', '1.5']) assert.throws(() => loadConfig({ ...base, PORT }), /PORT/);
+  });
+
   it('enables the read API with a key alone', () => {
     const config = loadConfig({ ...base, API_KEY: 'k' });
     assert.deepEqual([config.apiKey, config.graph], ['k', undefined]);
