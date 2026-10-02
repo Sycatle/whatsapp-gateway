@@ -13,6 +13,7 @@ npm ci
 cp .env.example .env && chmod 600 .env   # then fill it in
 npm run dev
 npm run check                            # type-check
+npm test                                 # node:test, no extra dependency
 ```
 
 The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunnel.
