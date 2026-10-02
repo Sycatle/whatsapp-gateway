@@ -1,4 +1,4 @@
-# whatsapp-handler
+# whatsapp-gateway
 
 WhatsApp Cloud API webhook receiver and sender. Node 22, TypeScript ESM, no runtime dependencies so far (not a rule), SQLite via node:sqlite.
 

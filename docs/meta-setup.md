@@ -70,14 +70,14 @@ The app can stay unpublished for this flow. Meta's warning that unpublished apps
 
 ## Run as a service
 
-Keep the server (and a named tunnel) alive with systemd user units. `~/.config/systemd/user/whatsapp-handler.service`:
+Keep the server (and a named tunnel) alive with systemd user units. `~/.config/systemd/user/whatsapp-gateway.service`:
 
 ```ini
 [Unit]
-Description=whatsapp-handler
+Description=whatsapp-gateway
 
 [Service]
-WorkingDirectory=%h/Workspace/whatsapp-handler
+WorkingDirectory=%h/Workspace/whatsapp-gateway
 ExecStart=/usr/bin/env npm start
 Restart=on-failure
 
@@ -86,9 +86,9 @@ WantedBy=default.target
 ```
 
 ```bash
-systemctl --user enable --now whatsapp-handler
+systemctl --user enable --now whatsapp-gateway
 loginctl enable-linger "$USER"      # keep running after logout and across reboots
-journalctl --user -u whatsapp-handler -f
+journalctl --user -u whatsapp-gateway -f
 ```
 
 If you use `scripts/whisper-server.py`, give it its own unit the same way and add `After=whisper-server.service` to the handler's `[Unit]`.

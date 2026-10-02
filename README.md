@@ -1,6 +1,6 @@
-# whatsapp-handler
+# whatsapp-gateway
 
-WhatsApp Cloud API handler in TypeScript: a signed webhook receiver, a sender for every message type, and a local store of conversations.
+WhatsApp Cloud API gateway in TypeScript: a signed webhook receiver, a sender for every message type, and a local store of conversations.
 
 - **Receives** every message type, edits, deletions, delivery statuses, history and contacts of a coexistence number, and downloads media.
 - **Keeps** messages, contacts and the 24 h window per chat in SQLite, queryable over HTTP.
