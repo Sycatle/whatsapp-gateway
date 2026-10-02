@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import { createApp } from './server.js';
 
-const graph = { accessToken: 'tok', phoneNumberId: '123', version: 'v25.0', apiKey: 'key' };
+const graph = { accessToken: 'tok', phoneNumberId: '123', version: 'v25.0' };
 const open = { port: 0, verifyToken: 'v', appSecret: 's', downloadsDir: 'downloads', dbPath: ':memory:' };
 
 async function listen(server: Server): Promise<string> {
@@ -18,7 +18,7 @@ describe('POST /messages', () => {
   const realFetch = globalThis.fetch;
 
   before(async () => {
-    const server = createApp({ ...open, graph });
+    const server = createApp({ ...open, apiKey: 'key', graph });
     servers.push(server);
     base = await listen(server);
   });

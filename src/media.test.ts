@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { createGraph } from './graph.js';
 import { saveMedia } from './media.js';
 
-const graph = createGraph({ accessToken: 'tok', phoneNumberId: '1', version: 'v25.0', apiKey: 'k' });
+const graph = createGraph({ accessToken: 'tok', phoneNumberId: '1', version: 'v25.0' });
 const file = Buffer.from('fake image bytes');
 const sha256 = createHash('sha256').update(file).digest('hex');
 

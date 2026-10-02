@@ -25,7 +25,11 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | GET | `/health` | `{"ok":true}` |
 | GET | `/webhook` | Meta verification handshake. |
 | POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per item (ids masked, no content). Understands every message type, edits and deletions by users, messages sent from the Business app, history and contact sync (coexistence), and passes other fields (templates, quality, account updates) through. With sending configured, also saves received images, videos, stickers, audio, voice notes and documents to `DOWNLOADS_DIR`. Bodies over 16 MiB get 413. |
-| POST | `/messages` | Sends a text. Requires `Authorization: Bearer $API_KEY`. 503 if sending is not configured. |
+| GET | `/conversations` | Chats with last activity and whether the 24 h window is open (`windowOpen`, `windowExpiresAt`). `?limit=`. Requires `Authorization: Bearer $API_KEY`. |
+| GET | `/conversations/:chat/messages` | Messages of a chat, newest first. `?limit=` and `?before=<timestamp>` to page. Same auth. |
+| DELETE | `/conversations/:chat` | Erases the chat's messages, contact entry and downloaded files. Same auth. |
+| GET | `/contacts` | Known contacts (address-book and profile names). Same auth. |
+| POST | `/messages` | Sends a text. Same auth. 503 if sending is not configured. |
 | POST | `/media` | Uploads the body and sends it as image, audio or document. Same auth. |
 
 ```bash
@@ -52,7 +56,7 @@ curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
 | `WHATSAPP_VERIFY_TOKEN` | Required. Shared secret for the handshake; choose it yourself. |
 | `WHATSAPP_ACCESS_TOKEN` | Optional. Enables sending. Temporary tokens expire after 24 h. |
 | `WHATSAPP_PHONE_NUMBER_ID` | Required with an access token. Sender number id. |
-| `API_KEY` | Required with an access token. Bearer key for the sending routes; choose a long random value. |
+| `API_KEY` | Bearer key for every route except `/health` and `/webhook` (503 if unset). Required with an access token; choose a long random value. |
 | `GRAPH_API_VERSION` | Default `v25.0`. |
 | `EVENTS_URL` | Optional. Every processed event is POSTed there as JSON (`messages`, `statuses`, `edits`, `revokes`, `contacts`, `history`, `changes`), retried 3 times on failure. |
 | `EVENTS_SECRET` | Required with `EVENTS_URL`. Each POST carries `X-Hub-Signature-256: sha256=<HMAC of the body>` keyed with it, so you verify it exactly like Meta's. |

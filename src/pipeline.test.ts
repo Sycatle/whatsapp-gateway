@@ -8,7 +8,7 @@ import { createGraph } from './graph.js';
 import { createPipeline } from './pipeline.js';
 import { openStore } from './store.js';
 
-const graph = createGraph({ accessToken: 'tok', phoneNumberId: '1', version: 'v25.0', apiKey: 'k' });
+const graph = createGraph({ accessToken: 'tok', phoneNumberId: '1', version: 'v25.0' });
 const wrap = (value: object, field = 'messages') => parseEvent({ entry: [{ changes: [{ field, value }] }] });
 
 afterEach(() => mock.restoreAll());

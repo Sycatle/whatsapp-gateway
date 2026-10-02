@@ -9,6 +9,11 @@ describe('loadConfig', () => {
     assert.throws(() => loadConfig({}));
   });
 
+  it('enables the read API with a key alone', () => {
+    const config = loadConfig({ ...base, API_KEY: 'k' });
+    assert.deepEqual([config.apiKey, config.graph], ['k', undefined]);
+  });
+
   it('leaves sending disabled without an access token', () => {
     assert.equal(loadConfig(base).graph, undefined);
   });
@@ -23,5 +28,6 @@ describe('loadConfig', () => {
     assert.throws(() => loadConfig({ ...base, WHATSAPP_ACCESS_TOKEN: 'a' }));
     const config = loadConfig({ ...base, WHATSAPP_ACCESS_TOKEN: 'a', WHATSAPP_PHONE_NUMBER_ID: 'p', API_KEY: 'k' });
     assert.equal(config.graph?.version, 'v25.0');
+    assert.equal(config.apiKey, 'k');
   });
 });

@@ -1,8 +1,9 @@
 export interface GraphConfig {
   accessToken: string;
   phoneNumberId: string;
+  /** Needed only for the `/waba` gateway (templates, subscriptions...). */
+  businessAccountId?: string;
   version: string;
-  apiKey: string;
 }
 
 export interface EventsConfig {
@@ -16,6 +17,8 @@ export interface Config {
   appSecret: string;
   downloadsDir: string;
   dbPath: string;
+  /** Bearer key for every route except the webhook and `/health`; those routes answer 503 without it. */
+  apiKey?: string;
   /** Where to forward processed events; absent when not configured. */
   events?: EventsConfig;
   /** Present only when sending is configured. */
@@ -41,11 +44,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   }
 
   const { WHATSAPP_ACCESS_TOKEN: accessToken, WHATSAPP_PHONE_NUMBER_ID: phoneNumberId, API_KEY: apiKey } = env;
+  if (apiKey) config.apiKey = apiKey;
   if (accessToken) {
     if (!phoneNumberId || !apiKey) {
       throw new Error('WHATSAPP_PHONE_NUMBER_ID et API_KEY requis quand WHATSAPP_ACCESS_TOKEN est défini');
     }
-    config.graph = { accessToken, phoneNumberId, apiKey, version: env.GRAPH_API_VERSION ?? 'v25.0' };
+    config.graph = { accessToken, phoneNumberId, version: env.GRAPH_API_VERSION ?? 'v25.0' };
+    if (env.WHATSAPP_BUSINESS_ACCOUNT_ID) config.graph.businessAccountId = env.WHATSAPP_BUSINESS_ACCOUNT_ID;
   }
   return config;
 }

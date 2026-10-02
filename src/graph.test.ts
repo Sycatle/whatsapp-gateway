@@ -2,7 +2,7 @@ import { afterEach, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { createGraph, GraphError } from './graph.js';
 
-const graph = createGraph({ accessToken: 'tok', phoneNumberId: '123', version: 'v25.0', apiKey: 'k' });
+const graph = createGraph({ accessToken: 'tok', phoneNumberId: '123', version: 'v25.0' });
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 afterEach(() => mock.restoreAll());
