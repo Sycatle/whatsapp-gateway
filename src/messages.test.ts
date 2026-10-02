@@ -84,7 +84,7 @@ describe('POST /messages', () => {
       });
       return calls;
     };
-    const upload = (query: string, mime: string, body = 'bytes') =>
+    const upload = (query: string, mime: string, body: BodyInit = 'bytes') =>
       realFetch(`${base}/media?${query}`, { method: 'POST', body, headers: { Authorization: 'Bearer key', 'Content-Type': mime } });
 
     it('uploads then sends an image with its caption', async () => {
@@ -102,6 +102,25 @@ describe('POST /messages', () => {
       const calls = stubGraph();
       await upload('to=33600000000&filename=invoice.pdf', 'application/pdf');
       assert.deepEqual(JSON.parse(calls[1]!.body as string).document, { id: 'media.1', filename: 'invoice.pdf' });
+    });
+
+    const ogg = (channels: number) =>
+      new Blob([Buffer.concat([Buffer.from('OggS'), Buffer.alloc(24), Buffer.from('OpusHead'), Buffer.from([1, channels])])]);
+
+    it('sends mono Ogg/Opus as a voice message', async () => {
+      const calls = stubGraph();
+      const res = await upload('to=33600000000&voice=true', 'audio/ogg', ogg(1));
+      assert.equal(res.status, 200);
+      assert.deepEqual(JSON.parse(calls[1]!.body as string).audio, { id: 'media.1', voice: true });
+    });
+
+    it('rejects voice messages that are not mono Ogg/Opus', async () => {
+      stubGraph();
+      const stereo = ogg(2);
+      assert.equal((await upload('to=33600000000&voice=true', 'audio/ogg', stereo)).status, 400);
+      assert.equal((await upload('to=33600000000&voice=true', 'audio/mpeg')).status, 400);
+      assert.equal((await upload('to=33600000000&voice=true', 'audio/ogg', 'not ogg')).status, 400);
+      assert.equal((await upload('to=33600000000&voice=true', 'image/png')).status, 400);
     });
 
     it('requires a recipient and a body', async () => {

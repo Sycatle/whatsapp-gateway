@@ -15,7 +15,17 @@ function classify(mimeType: string): { type: 'image' | 'audio' | 'document'; lim
   return { type: 'document', limit: 100 * MiB };
 }
 
-/** Sends the request body as a media message: `POST /media?to=...[&filename=...][&caption=...]`. */
+/** WhatsApp voice notes must be mono Ogg/Opus; returns why a file is not, or null. */
+function voiceProblem(bytes: Buffer, mimeType: string): string | null {
+  if (!mimeType.startsWith('audio/ogg')) return 'Voice messages must be audio/ogg';
+  const head = bytes.subarray(0, 256);
+  const opus = head.indexOf('OpusHead');
+  if (head.toString('latin1', 0, 4) !== 'OggS' || opus < 0) return 'Voice messages must be Ogg encoded with Opus';
+  if (head[opus + 9] !== 1) return 'Voice messages must be mono';
+  return null;
+}
+
+/** Sends the request body as a media message: `POST /media?to=...[&filename=...][&caption=...][&voice=true]`. */
 export async function sendMedia(req: IncomingMessage, res: ServerResponse, graph: Graph): Promise<void> {
   const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
   const to = params.get('to');
@@ -28,6 +38,10 @@ export async function sendMedia(req: IncomingMessage, res: ServerResponse, graph
   if (!bytes) return;
   if (!bytes.length) return sendJson(res, 400, { error: 'Empty body' });
 
+  const voice = params.get('voice') === 'true';
+  const problem = voice && (type !== 'audio' ? 'Voice messages must be audio/ogg' : voiceProblem(bytes, mimeType));
+  if (problem) return sendJson(res, 400, { error: problem });
+
   const filename = params.get('filename') ?? 'file';
   const caption = params.get('caption');
   try {
@@ -35,6 +49,7 @@ export async function sendMedia(req: IncomingMessage, res: ServerResponse, graph
     const media = {
       id: mediaId,
       ...(caption && type !== 'audio' && { caption }),
+      ...(voice && { voice: true }),
       ...(type === 'document' && { filename }),
     };
     sendJson(res, 200, { id: await graph.sendMessage({ to, type, [type]: media }) });

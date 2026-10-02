@@ -39,7 +39,7 @@ curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
   -H "Authorization: Bearer $API_KEY" -H 'Content-Type: image/png' --data-binary @photo.png
 ```
 
-`POST /media` takes the raw file as body and its MIME type as `Content-Type`. `image/*` is sent as an image (max 5 MiB), `audio/*` as audio (16 MiB), anything else as a document (100 MiB, use `filename=`). `caption` applies to images and documents.
+`POST /media` takes the raw file as body and its MIME type as `Content-Type`. `image/*` is sent as an image (max 5 MiB), `audio/*` as audio (16 MiB), anything else as a document (100 MiB, use `filename=`). `caption` applies to images and documents. Add `voice=true` with a mono Ogg/Opus file (`Content-Type: audio/ogg`) to send a real voice note; other files are rejected with 400. Meta only shows the play button for voice notes up to 512 KB.
 
 `to` is digits only, in international format. Free-form text only works within 24 hours of the recipient's last message; otherwise Meta rejects it (reported as 502 with Meta's error).
 
