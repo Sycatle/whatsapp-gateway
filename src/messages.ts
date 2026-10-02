@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Message } from './events.js';
-import { GraphError, type Graph } from './graph.js';
+import type { Graph } from './graph.js';
 import { readBody, sendJson } from './http.js';
 import type { Store } from './store.js';
 
@@ -30,15 +30,16 @@ async function deliver(
   content: unknown,
   replyTo?: string,
 ): Promise<void> {
+  const id = await graph.sendMessage({
+    ...(target.group && { recipient_type: 'group' }),
+    // Users known only by BSUID are addressed with `recipient`, everyone else with `to`.
+    ...(BSUID.test(target.to) ? { recipient: target.to } : { to: target.to }),
+    type,
+    [type]: content,
+    ...(replyTo && { context: { message_id: replyTo } }),
+  });
+  // The message is gone: failing to keep a copy must not turn into an error the client would retry (a duplicate send).
   try {
-    const id = await graph.sendMessage({
-      ...(target.group && { recipient_type: 'group' }),
-      // Users known only by BSUID are addressed with `recipient`, everyone else with `to`.
-      ...(BSUID.test(target.to) ? { recipient: target.to } : { to: target.to }),
-      type,
-      [type]: content,
-      ...(replyTo && { context: { message_id: replyTo } }),
-    });
     const stored: Message = {
       id, chat: store.resolveChat(target.to), from: 'api', direction: 'out', source: 'api', type,
       timestamp: Math.floor(Date.now() / 1000), content: Array.isArray(content) ? { items: content } : (content as Message['content']),
@@ -46,11 +47,10 @@ async function deliver(
     };
     if (replyTo) stored.contextId = replyTo;
     store.saveMessages([stored]);
-    sendJson(res, 200, { id });
   } catch (error) {
-    if (!(error instanceof GraphError)) throw error;
-    sendJson(res, 502, { error: error.message, code: error.code });
+    console.error(`sent message id=${id} could not be stored: ${error instanceof Error ? error.message : error}`);
   }
+  sendJson(res, 200, { id });
 }
 
 const MiB = 1024 * 1024;
@@ -98,13 +98,7 @@ export async function sendMedia(req: IncomingMessage, res: ServerResponse, deps:
 
   const filename = params.get('filename') ?? 'file';
   const caption = params.get('caption');
-  let mediaId: string;
-  try {
-    mediaId = await deps.graph.upload(bytes, mimeType, filename);
-  } catch (error) {
-    if (!(error instanceof GraphError)) throw error;
-    return sendJson(res, 502, { error: error.message, code: error.code });
-  }
+  const mediaId = await deps.graph.upload(bytes, mimeType, filename);
   const media = {
     id: mediaId,
     ...(caption && (type === 'image' || type === 'video' || type === 'document') && { caption }),
@@ -174,11 +168,6 @@ export async function markRead(req: IncomingMessage, res: ServerResponse, graph:
   if (typeof input?.message_id !== 'string' || !input.message_id) {
     return sendJson(res, 400, { error: '"message_id" must be the id of a received message' });
   }
-  try {
-    await graph.markRead(input.message_id, input.typing === true);
-    sendJson(res, 200, { ok: true });
-  } catch (error) {
-    if (!(error instanceof GraphError)) throw error;
-    sendJson(res, 502, { error: error.message, code: error.code });
-  }
+  await graph.markRead(input.message_id, input.typing === true);
+  sendJson(res, 200, { ok: true });
 }

@@ -66,6 +66,20 @@ describe('read API', () => {
     assert.equal((await get('/conversations/a%20b/messages')).status, 400);
   });
 
+  it('survives a request URL the parser rejects', async () => {
+    const { connect } = await import('node:net');
+    const { port } = server.address() as AddressInfo;
+    const status = await new Promise<string>((resolve, reject) => {
+      const socket = connect(port, '127.0.0.1', () => socket.write('GET // HTTP/1.1\r\nHost: x\r\nConnection: close\r\n\r\n'));
+      let data = '';
+      socket.on('data', (chunk) => (data += chunk));
+      socket.on('end', () => resolve(data.split('\r\n')[0]!));
+      socket.on('error', reject);
+    });
+    assert.equal(status, 'HTTP/1.1 400 Bad Request');
+    assert.equal((await get('/conversations')).status, 200);
+  });
+
   it('erases a conversation and its downloaded file', async () => {
     const realFetch = globalThis.fetch;
     mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {

@@ -2,7 +2,7 @@ import { createServer, type Server } from 'node:http';
 import { hasBearer } from './auth.js';
 import type { Config } from './config.js';
 import { SeenKeys, type ParsedEvent } from './events.js';
-import { createGraph, type Graph } from './graph.js';
+import { createGraph, GraphError, type Graph } from './graph.js';
 import { gateway } from './gateway.js';
 import { sendJson } from './http.js';
 import { deleteMedia, fetchMedia } from './media.js';
@@ -71,14 +71,24 @@ export function createApp(config: Config): Server {
   });
 
   const server = createServer(async (req, res) => {
-    const url = new URL(req.url ?? '/', 'http://localhost');
-    const match = route(req.method ?? '', url.pathname);
     try {
+      let url: URL;
+      try {
+        url = new URL(req.url ?? '/', 'http://localhost');
+      } catch {
+        return sendJson(res, 400, { error: 'Invalid URL' });
+      }
+      const match = route(req.method ?? '', url.pathname);
       if (match) await match.handler({ req, res, url, params: match.params });
       else res.writeHead(404).end('Not found');
     } catch (error) {
+      if (res.headersSent) return void res.destroy();
+      if (error instanceof GraphError) {
+        // Meta refused, or could not be reached: this gateway is a bad gateway, not a broken server.
+        return sendJson(res, error.status === 504 ? 504 : 502, { error: error.message, code: error.code });
+      }
       console.error(error);
-      if (!res.headersSent) sendJson(res, 500, { error: 'Internal error' });
+      sendJson(res, 500, { error: 'Internal error' });
     }
   });
   server.on('close', () => store.close());

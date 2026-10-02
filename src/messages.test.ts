@@ -1,8 +1,11 @@
 import { after, afterEach, before, describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AddressInfo } from 'node:net';
-import type { Server } from 'node:http';
+import { createServer, type Server } from 'node:http';
+import type { Graph } from './graph.js';
+import { sendMessage } from './messages.js';
 import { createApp } from './server.js';
+import type { Store } from './store.js';
 
 const graph = { accessToken: 'tok', phoneNumberId: '123', version: 'v25.0' };
 const open = { port: 0, verifyToken: 'v', appSecret: 's', downloadsDir: 'downloads', dbPath: ':memory:' };
@@ -55,6 +58,43 @@ describe('POST /messages', () => {
     assert.deepEqual(calls[0], {
       messaging_product: 'whatsapp', to: '33600000000', type: 'text', text: { body: 'hello' },
     });
+  });
+
+  it('reports an unreachable or slow Graph API as 502 / 504', async () => {
+    mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).startsWith(base)) return realFetch(url, init);
+      throw new TypeError('fetch failed');
+    });
+    const down = await post({ to: '33600000000', text: 'hello' });
+    assert.equal(down.status, 502);
+    assert.deepEqual(await down.json(), { error: 'Graph API unreachable' });
+
+    mock.restoreAll();
+    mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+      if (String(url).startsWith(base)) return realFetch(url, init);
+      throw new DOMException('timed out', 'TimeoutError');
+    });
+    assert.equal((await post({ to: '33600000000', text: 'hello' })).status, 504);
+  });
+
+  it('rejects a Graph answer without a message id', async () => {
+    mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) =>
+      String(url).startsWith(base) ? realFetch(url, init) : new Response(JSON.stringify({ messages: [] })));
+    assert.equal((await post({ to: '33600000000', text: 'hello' })).status, 502);
+  });
+
+  it('still answers 200 when a sent message cannot be stored', async () => {
+    const deps = {
+      graph: { sendMessage: async () => 'wamid.9' } as unknown as Graph,
+      store: { resolveChat: (id: string) => id, saveMessages: () => { throw new Error('disk full'); } } as unknown as Store,
+    };
+    const server = createServer((req, res) => void sendMessage(req, res, deps));
+    servers.push(server);
+    const url = await listen(server);
+    mock.method(console, 'error', () => {});
+    const res = await realFetch(url, { method: 'POST', body: JSON.stringify({ to: '33600000000', text: 'x' }) });
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { id: 'wamid.9' });
   });
 
   describe('message types', () => {
