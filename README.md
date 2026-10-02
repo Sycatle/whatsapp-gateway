@@ -29,14 +29,27 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | GET | `/conversations/:chat/messages` | Messages of a chat, newest first. `?limit=` and `?before=<timestamp>` to page. Same auth. |
 | DELETE | `/conversations/:chat` | Erases the chat's messages, contact entry and downloaded files. Same auth. |
 | GET | `/contacts` | Known contacts (address-book and profile names). Same auth. |
-| POST | `/messages` | Sends a text. Same auth. 503 if sending is not configured. |
+| POST | `/messages` | Sends any message type. Same auth. 503 if sending is not configured. |
 | POST | `/media` | Uploads the body and sends it as image, audio or document. Same auth. |
+
+`POST /messages` takes JSON: a recipient (`to`: digits only, international format, or `group`), a `type` (default `text`) and the Cloud API object of that type. Optional `reply_to` (a message id) quotes a message.
 
 ```bash
 curl -X POST http://127.0.0.1:3000/messages \
   -H "Authorization: Bearer $API_KEY" -H 'Content-Type: application/json' \
   -d '{"to":"33600000000","text":"Hello"}'
 ```
+
+Other bodies:
+
+```json
+{"to":"33600000000","text":"On it","reply_to":"wamid.HBg..."}
+{"to":"33600000000","type":"reaction","reaction":{"message_id":"wamid.HBg...","emoji":"👍"}}
+{"to":"33600000000","type":"location","location":{"latitude":48.85,"longitude":2.35,"name":"Paris"}}
+{"to":"33600000000","type":"template","template":{"name":"hello","language":{"code":"fr"}}}
+```
+
+Supported types: `text`, `image`, `audio`, `video`, `document`, `sticker`, `location`, `contacts` (an array), `interactive` (buttons, lists, CTA URL, flows, location request), `template`, `reaction`. Media can reference an uploaded `id` or a public `link`. Sent messages are stored with status `pending` until Meta reports `sent`, `delivered` or `read`.
 
 ```bash
 curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
@@ -45,7 +58,7 @@ curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
 
 `POST /media` takes the raw file as body and its MIME type as `Content-Type`. `image/*` is sent as an image (max 5 MiB), `audio/*` as audio (16 MiB), anything else as a document (100 MiB, use `filename=`). `caption` applies to images and documents. Add `voice=true` with a mono Ogg/Opus file (`Content-Type: audio/ogg`) to send a real voice note; other files are rejected with 400. Meta only shows the play button for voice notes up to 512 KB.
 
-`to` is digits only, in international format. Free-form text only works within 24 hours of the recipient's last message; otherwise Meta rejects it (reported as 502 with Meta's error).
+Free-form messages only work within 24 hours of the recipient's last message (see `windowOpen` in `/conversations`); otherwise use a template. Meta's refusals come back as 502 with Meta's error message and code. `group` needs the Groups API (official business account, not available in coexistence).
 
 ## Environment
 

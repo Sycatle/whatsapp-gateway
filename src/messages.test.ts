@@ -57,6 +57,66 @@ describe('POST /messages', () => {
     });
   });
 
+  describe('message types', () => {
+    let sent = 0;
+    const capture = () => {
+      const calls: Record<string, unknown>[] = [];
+      mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).startsWith(base)) return realFetch(url, init);
+        calls.push(JSON.parse(init!.body as string));
+        return new Response(JSON.stringify({ messages: [{ id: `wamid.sent${++sent}` }] }));
+      });
+      return calls;
+    };
+
+    it('sends a quoted reply with a link preview', async () => {
+      const calls = capture();
+      await post({ to: '33600000000', text: 'see https://x.io', reply_to: 'wamid.in', preview_url: true });
+      assert.deepEqual(calls[0], {
+        messaging_product: 'whatsapp', to: '33600000000', type: 'text',
+        text: { body: 'see https://x.io', preview_url: true }, context: { message_id: 'wamid.in' },
+      });
+    });
+
+    it('passes the Cloud API object of every other type through', async () => {
+      const calls = capture();
+      const bodies = [
+        { type: 'reaction', reaction: { message_id: 'wamid.in', emoji: '👍' } },
+        { type: 'location', location: { latitude: 48.85, longitude: 2.35, name: 'Paris' } },
+        { type: 'contacts', contacts: [{ name: { formatted_name: 'Ada' }, phones: [{ phone: '+33600000001' }] }] },
+        { type: 'template', template: { name: 'hello', language: { code: 'fr' } } },
+        { type: 'interactive', interactive: { type: 'button', body: { text: 'ok?' }, action: { buttons: [] } } },
+        { type: 'sticker', sticker: { id: '9' } },
+        { type: 'video', video: { link: 'https://x.io/v.mp4' } },
+      ];
+      for (const body of bodies) assert.equal((await post({ to: '33600000000', ...body })).status, 200);
+      assert.deepEqual(calls.map((c) => c.type), bodies.map((b) => b.type));
+      assert.deepEqual(calls[2]!.contacts, bodies[2]!.contacts);
+    });
+
+    it('sends to a group', async () => {
+      const calls = capture();
+      await post({ group: 'GROUPID', text: 'hi all' });
+      assert.deepEqual([calls[0]!.recipient_type, calls[0]!.to], ['group', 'GROUPID']);
+    });
+
+    it('rejects unknown types and ambiguous recipients', async () => {
+      assert.equal((await post({ to: '33600000000', type: 'poll', poll: {} })).status, 400);
+      assert.equal((await post({ to: '33600000000', group: 'G', text: 'x' })).status, 400);
+      assert.equal((await post({ text: 'x' })).status, 400);
+      assert.equal((await post({ to: '33600000000', type: 'location', location: 'nope' })).status, 400);
+      assert.equal((await post({ to: '33600000000', type: 'contacts', contacts: {} })).status, 400);
+    });
+
+    it('keeps sent messages in the conversation, as pending', async () => {
+      capture();
+      await post({ to: '33600000042', text: 'stored' });
+      const res = await realFetch(`${base}/conversations/33600000042/messages`, { headers: { Authorization: 'Bearer key' } });
+      const { messages } = await res.json() as { messages: { direction: string; source: string; status: string; content: unknown }[] };
+      assert.deepEqual([messages[0]!.direction, messages[0]!.source, messages[0]!.status, messages[0]!.content], ['out', 'api', 'pending', { body: 'stored' }]);
+    });
+  });
+
   it('reports Graph failures as 502', async () => {
     mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) =>
       String(url).startsWith(base)

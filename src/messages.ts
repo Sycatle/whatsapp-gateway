@@ -1,10 +1,52 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { Message } from './events.js';
 import { GraphError, type Graph } from './graph.js';
 import { readBody, sendJson } from './http.js';
+import type { Store } from './store.js';
 
 const MAX_JSON = 64 * 1024;
 /** International format without "+", as expected by the Cloud API. */
 const PHONE = /^\d{8,15}$/;
+const GROUP_ID = /^[\w=-]+$/;
+
+export interface SendDeps {
+  graph: Graph;
+  store: Store;
+}
+
+/** Message types the Cloud API accepts, all sent through the same `messages` endpoint. */
+const TYPES = ['text', 'image', 'audio', 'video', 'document', 'sticker', 'location', 'contacts', 'interactive', 'template', 'reaction'];
+
+/** Sends a message object and keeps a copy in the store. */
+async function deliver(
+  { graph, store }: SendDeps,
+  res: ServerResponse,
+  target: { chat: string; group: boolean },
+  type: string,
+  content: unknown,
+  replyTo?: string,
+): Promise<void> {
+  try {
+    const id = await graph.sendMessage({
+      ...(target.group && { recipient_type: 'group' }),
+      to: target.chat,
+      type,
+      [type]: content,
+      ...(replyTo && { context: { message_id: replyTo } }),
+    });
+    const stored: Message = {
+      id, chat: target.chat, from: 'api', direction: 'out', source: 'api', type,
+      timestamp: Math.floor(Date.now() / 1000), content: Array.isArray(content) ? { items: content } : (content as Message['content']),
+      status: 'pending',
+    };
+    if (replyTo) stored.contextId = replyTo;
+    store.saveMessages([stored]);
+    sendJson(res, 200, { id });
+  } catch (error) {
+    if (!(error instanceof GraphError)) throw error;
+    sendJson(res, 502, { error: error.message, code: error.code });
+  }
+}
 
 const MiB = 1024 * 1024;
 
@@ -26,7 +68,7 @@ function voiceProblem(bytes: Buffer, mimeType: string): string | null {
 }
 
 /** Sends the request body as a media message: `POST /media?to=...[&filename=...][&caption=...][&voice=true]`. */
-export async function sendMedia(req: IncomingMessage, res: ServerResponse, graph: Graph): Promise<void> {
+export async function sendMedia(req: IncomingMessage, res: ServerResponse, deps: SendDeps): Promise<void> {
   const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
   const to = params.get('to');
   const mimeType = req.headers['content-type']?.trim();
@@ -44,44 +86,67 @@ export async function sendMedia(req: IncomingMessage, res: ServerResponse, graph
 
   const filename = params.get('filename') ?? 'file';
   const caption = params.get('caption');
+  let mediaId: string;
   try {
-    const mediaId = await graph.upload(bytes, mimeType, filename);
-    const media = {
-      id: mediaId,
-      ...(caption && type !== 'audio' && { caption }),
-      ...(voice && { voice: true }),
-      ...(type === 'document' && { filename }),
-    };
-    sendJson(res, 200, { id: await graph.sendMessage({ to, type, [type]: media }) });
+    mediaId = await deps.graph.upload(bytes, mimeType, filename);
   } catch (error) {
     if (!(error instanceof GraphError)) throw error;
-    sendJson(res, 502, { error: error.message, code: error.code });
+    return sendJson(res, 502, { error: error.message, code: error.code });
   }
+  const media = {
+    id: mediaId,
+    ...(caption && type !== 'audio' && { caption }),
+    ...(voice && { voice: true }),
+    ...(type === 'document' && { filename }),
+  };
+  await deliver(deps, res, { chat: to, group: false }, type, media);
 }
 
-export async function sendText(req: IncomingMessage, res: ServerResponse, graph: Graph): Promise<void> {
+/**
+ * `POST /messages` with `{ to | group, type?, <type>: {...}, reply_to?, preview_url? }`. The `<type>` object is the
+ * Cloud API one (`image: { id }`, `template: { name, language }`, `location`, `contacts`, `interactive`, `reaction`...).
+ * Plain text can be written `{ to, text: "hello" }`.
+ */
+export async function sendMessage(req: IncomingMessage, res: ServerResponse, deps: SendDeps): Promise<void> {
   const raw = await readBody(req, res, MAX_JSON);
   if (!raw) return;
 
-  let input: { to?: unknown; text?: unknown };
+  let input: Record<string, unknown>;
   try {
-    input = JSON.parse(raw.toString());
+    const parsed: unknown = JSON.parse(raw.toString());
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) throw new Error();
+    input = parsed as Record<string, unknown>;
   } catch {
-    return sendJson(res, 400, { error: 'Body must be JSON' });
-  }
-  const { to, text } = input;
-  if (typeof to !== 'string' || !PHONE.test(to)) {
-    return sendJson(res, 400, { error: '"to" must be digits only, in international format' });
-  }
-  if (typeof text !== 'string' || !text || text.length > 4096) {
-    return sendJson(res, 400, { error: '"text" must be a string of 1 to 4096 characters' });
+    return sendJson(res, 400, { error: 'Body must be a JSON object' });
   }
 
-  try {
-    const id = await graph.sendMessage({ to, type: 'text', text: { body: text } });
-    sendJson(res, 200, { id });
-  } catch (error) {
-    if (!(error instanceof GraphError)) throw error;
-    sendJson(res, 502, { error: error.message, code: error.code });
+  const { to, group, reply_to: replyTo } = input;
+  if ((to === undefined) === (group === undefined)) return sendJson(res, 400, { error: 'Give either "to" or "group"' });
+  if (to !== undefined && (typeof to !== 'string' || !PHONE.test(to))) {
+    return sendJson(res, 400, { error: '"to" must be digits only, in international format' });
   }
+  if (group !== undefined && (typeof group !== 'string' || !GROUP_ID.test(group))) {
+    return sendJson(res, 400, { error: '"group" must be a group id' });
+  }
+  if (replyTo !== undefined && typeof replyTo !== 'string') return sendJson(res, 400, { error: '"reply_to" must be a message id' });
+
+  const type = input.type ?? 'text';
+  if (typeof type !== 'string' || !TYPES.includes(type)) {
+    return sendJson(res, 400, { error: `"type" must be one of: ${TYPES.join(', ')}` });
+  }
+
+  let content = input[type];
+  if (type === 'text' && typeof content === 'string') {
+    content = { body: content, ...(input.preview_url === true && { preview_url: true }) };
+  }
+  if (type === 'text') {
+    const body = (content as { body?: unknown } | undefined)?.body;
+    if (typeof body !== 'string' || !body || body.length > 4096) {
+      return sendJson(res, 400, { error: '"text" must be a string of 1 to 4096 characters' });
+    }
+  }
+  const valid = type === 'contacts' ? Array.isArray(content) : typeof content === 'object' && content !== null && !Array.isArray(content);
+  if (!valid) return sendJson(res, 400, { error: `"${type}" must be ${type === 'contacts' ? 'an array' : 'an object'}` });
+
+  await deliver(deps, res, { chat: (to ?? group) as string, group: group !== undefined }, type, content, replyTo);
 }

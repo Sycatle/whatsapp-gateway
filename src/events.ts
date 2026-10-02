@@ -1,6 +1,6 @@
 export type Direction = 'in' | 'out';
-/** `webhook`: live Cloud API traffic, `app`: sent from the WhatsApp Business app, `history`: synced backlog. */
-export type Source = 'webhook' | 'app' | 'history';
+/** `webhook`: live Cloud API traffic, `api`: sent through this server, `app`: sent from the WhatsApp Business app, `history`: synced backlog. */
+export type Source = 'webhook' | 'api' | 'app' | 'history';
 
 export interface Message {
   id: string;
