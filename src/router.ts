@@ -23,25 +23,28 @@ export function createRouter(table: Record<string, Handler>) {
     return { method, segments: path.split('/').filter(Boolean), handler };
   });
 
+  function matchRoute(route: Route, parts: string[]): Record<string, string> | null {
+    const params: Record<string, string> = {};
+    for (const [i, segment] of route.segments.entries()) {
+      if (segment === '*') {
+        if (parts.length <= i) return null;
+        params.rest = parts.slice(i).join('/');
+        return params;
+      }
+      const part = parts[i];
+      if (part === undefined) return null;
+      if (segment.startsWith(':')) params[segment.slice(1)] = part;
+      else if (segment !== part) return null;
+    }
+    return parts.length === route.segments.length ? params : null;
+  }
+
   return function match(method: string, pathname: string): { handler: Handler; params: Record<string, string> } | null {
     const parts = pathname.split('/').filter(Boolean);
     for (const route of routes) {
       if (route.method !== method) continue;
-      const params: Record<string, string> = {};
-      let ok = true;
-      for (let i = 0; i < route.segments.length && ok; i++) {
-        const segment = route.segments[i]!;
-        if (segment === '*') {
-          params.rest = parts.slice(i).join('/');
-          ok = parts.length > i;
-          break;
-        }
-        if (parts[i] === undefined) ok = false;
-        else if (segment.startsWith(':')) params[segment.slice(1)] = parts[i]!;
-        else ok = segment === parts[i];
-        if (i === route.segments.length - 1 && parts.length > route.segments.length) ok = false;
-      }
-      if (ok) return { handler: route.handler, params };
+      const params = matchRoute(route, parts);
+      if (params) return { handler: route.handler, params };
     }
     return null;
   };
