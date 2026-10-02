@@ -1,4 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { readBody } from './http.js';
 import { safeEqual, verifySignature } from './auth.js';
 import type { Config } from './config.js';
 import { describe, dropSeen, parseEvent, type SeenKeys } from './events.js';
@@ -15,17 +16,8 @@ export function verifyHandshake(url: URL, res: ServerResponse, config: Config): 
 
 export async function receiveEvent(req: IncomingMessage, res: ServerResponse, config: Config, seen: SeenKeys): Promise<void> {
   try {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    for await (const chunk of req) {
-      size += chunk.length;
-      if (size > MAX_BODY) {
-        res.writeHead(413).end();
-        return;
-      }
-      chunks.push(Buffer.from(chunk));
-    }
-    const body = Buffer.concat(chunks);
+    const body = await readBody(req, res, MAX_BODY);
+    if (!body) return;
     if (!verifySignature(body, req.headers['x-hub-signature-256'] as string | undefined, config.appSecret)) {
       res.writeHead(403).end('Invalid signature');
       return;
