@@ -3,6 +3,7 @@ import { hasBearer } from './auth.js';
 import type { Config } from './config.js';
 import { SeenKeys, type ParsedEvent } from './events.js';
 import { createGraph, type Graph } from './graph.js';
+import { gateway } from './gateway.js';
 import { sendJson } from './http.js';
 import { deleteMedia, fetchMedia } from './media.js';
 import { markRead, sendMedia, sendMessage } from './messages.js';
@@ -43,7 +44,17 @@ export function createApp(config: Config): Server {
     await handler(ctx, graph);
   };
 
+  const gateways: Record<string, Handler> = {};
+  for (const target of ['phone', 'waba'] as const) {
+    for (const method of ['GET', 'POST', 'DELETE']) {
+      const handler = sendingRoute((ctx, g) => gateway(ctx, g, target));
+      gateways[`${method} /${target}`] = handler;
+      gateways[`${method} /${target}/*`] = handler;
+    }
+  }
+
   const route = createRouter({
+    ...gateways,
     'GET /health': ({ res }) => sendJson(res, 200, { ok: true }),
     'GET /webhook': ({ res, url }) => verifyHandshake(url, res, config),
     'POST /webhook': ({ req, res }) => receiveEvent(req, res, config, seen, handleEvent),

@@ -31,6 +31,7 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | GET | `/contacts` | Known contacts (address-book and profile names). Same auth. |
 | POST | `/messages` | Sends any message type. Same auth. 503 if sending is not configured. |
 | POST | `/read` | `{"message_id":"wamid...","typing":true}`: marks a received message as read (blue ticks) and optionally shows "typing..." until you reply or 25 s pass. Same auth. |
+| GET, POST, DELETE | `/phone/*`, `/waba/*` | Gateway to the rest of the Cloud API, see below. Same auth. |
 | POST | `/media` | Uploads the body and sends it as image, video, audio, sticker or document. Same auth. |
 | GET, DELETE | `/media/:id` | Downloads a media file from Meta by id, or deletes an uploaded one. Same auth. |
 
@@ -62,6 +63,28 @@ curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
 
 Free-form messages only work within 24 hours of the recipient's last message (see `windowOpen` in `/conversations`); otherwise use a template. Meta's refusals come back as 502 with Meta's error message and code. `group` needs the Groups API (official business account, not available in coexistence).
 
+## Everything else: `/phone` and `/waba`
+
+The Graph API is reachable through two prefixes, with the server's token and Graph's own status and body relayed back. `/phone/<path>` becomes `/<WHATSAPP_PHONE_NUMBER_ID>/<path>` and `/waba/<path>` becomes `/<WHATSAPP_BUSINESS_ACCOUNT_ID>/<path>`. Nothing else of the Graph API is reachable, and `/phone/messages` and `/phone/media` are refused in favor of the typed routes above (they keep the store in sync).
+
+| Need | Call |
+| --- | --- |
+| Message templates | `GET`, `POST`, `DELETE /waba/message_templates` |
+| Business profile | `GET`, `POST /phone/whatsapp_business_profile` |
+| Block or unblock a user | `GET`, `POST`, `DELETE /phone/block_users` |
+| Phone numbers, quality, coexistence status | `GET /waba/phone_numbers`, `GET /phone?fields=is_on_biz_app,platform_type,quality_rating` |
+| Webhook subscription of the app | `GET`, `POST`, `DELETE /waba/subscribed_apps` |
+| Coexistence contact and history sync | `POST /phone/smb_app_data` with `{"messaging_product":"whatsapp","sync_type":"smb_app_state_sync"}` then `"history"` |
+| Groups | `/phone/groups...` |
+| Calls | `POST /phone/calls` |
+| QR codes, flows | `/phone/message_qrcodes`, `/waba/flows` |
+
+```bash
+curl -H "Authorization: Bearer $API_KEY" "http://127.0.0.1:3000/waba/message_templates?fields=name,status"
+```
+
+Paths and bodies are Meta's: see the [Cloud API reference](https://developers.facebook.com/documentation/business-messaging/whatsapp).
+
 ## Environment
 
 | Variable | Purpose |
@@ -72,6 +95,7 @@ Free-form messages only work within 24 hours of the recipient's last message (se
 | `WHATSAPP_ACCESS_TOKEN` | Optional. Enables sending. Temporary tokens expire after 24 h. |
 | `WHATSAPP_PHONE_NUMBER_ID` | Required with an access token. Sender number id. |
 | `API_KEY` | Bearer key for every route except `/health` and `/webhook` (503 if unset). Required with an access token; choose a long random value. |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID` | Optional. Enables the `/waba` gateway. |
 | `GRAPH_API_VERSION` | Default `v25.0`. |
 | `EVENTS_URL` | Optional. Every processed event is POSTed there as JSON (`messages`, `statuses`, `edits`, `revokes`, `contacts`, `history`, `changes`), retried 3 times on failure. |
 | `EVENTS_SECRET` | Required with `EVENTS_URL`. Each POST carries `X-Hub-Signature-256: sha256=<HMAC of the body>` keyed with it, so you verify it exactly like Meta's. |

@@ -12,11 +12,16 @@ export type Graph = ReturnType<typeof createGraph>;
 export function createGraph(config: GraphConfig) {
   const base = `https://graph.facebook.com/${config.version}`;
 
-  async function request(path: string, init: RequestInit = {}): Promise<Response> {
-    const res = await fetch(path.startsWith('https://') ? path : `${base}/${path}`, {
+  /** Calls the Graph API with the access token and returns the response whatever its status. */
+  function raw(path: string, init: RequestInit = {}): Promise<Response> {
+    return fetch(path.startsWith('https://') ? path : `${base}/${path}`, {
       ...init,
       headers: { Authorization: `Bearer ${config.accessToken}`, ...init.headers },
     });
+  }
+
+  async function request(path: string, init: RequestInit = {}): Promise<Response> {
+    const res = await raw(path, init);
     if (res.ok) return res;
     const { error } = (await res.json().catch(() => ({}))) as { error?: { message?: string; code?: number } };
     const message = error?.code === 190
@@ -72,5 +77,8 @@ export function createGraph(config: GraphConfig) {
       return { bytes, mimeType: info.mime_type };
     },
     request,
+    raw,
+    phoneNumberId: config.phoneNumberId,
+    businessAccountId: config.businessAccountId,
   };
 }
