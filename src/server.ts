@@ -5,7 +5,7 @@ import { SeenKeys, type ParsedEvent } from './events.js';
 import { createGraph, type Graph } from './graph.js';
 import { sendJson } from './http.js';
 import { saveMedia } from './media.js';
-import { sendText } from './messages.js';
+import { sendMedia, sendText } from './messages.js';
 import { receiveEvent, verifyHandshake } from './webhook.js';
 
 export function createApp(config: Config): Server {
@@ -35,6 +35,7 @@ export function createApp(config: Config): Server {
     'GET /webhook': (_req, res, url) => verifyHandshake(url, res, config),
     'POST /webhook': (req, res) => receiveEvent(req, res, config, seen, handleEvent),
     'POST /messages': protectedRoute(sendText),
+    'POST /media': protectedRoute(sendMedia),
   };
 
   return createServer(async (req, res) => {

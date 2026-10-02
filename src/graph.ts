@@ -36,6 +36,15 @@ export function createGraph(config: GraphConfig) {
       const { messages } = (await res.json()) as { messages: { id: string }[] };
       return messages[0]!.id;
     },
+    /** Uploads a file and returns its media id. */
+    async upload(bytes: Buffer<ArrayBuffer>, mimeType: string, filename: string): Promise<string> {
+      const form = new FormData();
+      form.set('messaging_product', 'whatsapp');
+      form.set('type', mimeType);
+      form.set('file', new Blob([bytes], { type: mimeType }), filename);
+      const res = await request(`${config.phoneNumberId}/media`, { method: 'POST', body: form });
+      return ((await res.json()) as { id: string }).id;
+    },
     /** Downloads a received media file, refusing anything above `maxBytes` or with a wrong checksum. */
     async download(mediaId: string, maxBytes: number): Promise<{ bytes: Buffer; mimeType: string }> {
       const info = (await (await request(mediaId)).json()) as {

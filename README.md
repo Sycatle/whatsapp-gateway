@@ -26,12 +26,20 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | GET | `/webhook` | Meta verification handshake. |
 | POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per message or status (phone masked, no content). With sending configured, also saves received images, audio, voice notes and documents to `DOWNLOADS_DIR`. Bodies over 1 MiB get 413. |
 | POST | `/messages` | Sends a text. Requires `Authorization: Bearer $API_KEY`. 503 if sending is not configured. |
+| POST | `/media` | Uploads the body and sends it as image, audio or document. Same auth. |
 
 ```bash
 curl -X POST http://127.0.0.1:3000/messages \
   -H "Authorization: Bearer $API_KEY" -H 'Content-Type: application/json' \
   -d '{"to":"33600000000","text":"Hello"}'
 ```
+
+```bash
+curl -X POST "http://127.0.0.1:3000/media?to=33600000000&caption=Hi" \
+  -H "Authorization: Bearer $API_KEY" -H 'Content-Type: image/png' --data-binary @photo.png
+```
+
+`POST /media` takes the raw file as body and its MIME type as `Content-Type`. `image/*` is sent as an image (max 5 MiB), `audio/*` as audio (16 MiB), anything else as a document (100 MiB, use `filename=`). `caption` applies to images and documents.
 
 `to` is digits only, in international format. Free-form text only works within 24 hours of the recipient's last message; otherwise Meta rejects it (reported as 502 with Meta's error).
 

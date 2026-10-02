@@ -4,7 +4,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
  * Reads the whole request body, or answers 413 and closes the connection once
  * `limit` bytes are exceeded. Returns null when the response was already sent.
  */
-export function readBody(req: IncomingMessage, res: ServerResponse, limit: number): Promise<Buffer | null> {
+export function readBody(req: IncomingMessage, res: ServerResponse, limit: number): Promise<Buffer<ArrayBuffer> | null> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let size = 0;

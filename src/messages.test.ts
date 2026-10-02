@@ -73,4 +73,44 @@ describe('POST /messages', () => {
     const res = await realFetch(`${await listen(server)}/messages`, { method: 'POST', body: '{}' });
     assert.equal(res.status, 503);
   });
+
+  describe('media', () => {
+    const stubGraph = () => {
+      const calls: { url: string; body: unknown }[] = [];
+      mock.method(globalThis, 'fetch', async (url: string | URL | Request, init?: RequestInit) => {
+        if (String(url).startsWith(base)) return realFetch(url, init);
+        calls.push({ url: String(url), body: init!.body });
+        return new Response(JSON.stringify(String(url).endsWith('/media') ? { id: 'media.1' } : { messages: [{ id: 'wamid.8' }] }));
+      });
+      return calls;
+    };
+    const upload = (query: string, mime: string, body = 'bytes') =>
+      realFetch(`${base}/media?${query}`, { method: 'POST', body, headers: { Authorization: 'Bearer key', 'Content-Type': mime } });
+
+    it('uploads then sends an image with its caption', async () => {
+      const calls = stubGraph();
+      const res = await upload('to=33600000000&caption=Look', 'image/png');
+      assert.deepEqual(await res.json(), { id: 'wamid.8' });
+      assert.equal(calls[0]!.url, 'https://graph.facebook.com/v25.0/123/media');
+      assert.equal((calls[0]!.body as FormData).get('type'), 'image/png');
+      assert.deepEqual(JSON.parse(calls[1]!.body as string), {
+        messaging_product: 'whatsapp', to: '33600000000', type: 'image', image: { id: 'media.1', caption: 'Look' },
+      });
+    });
+
+    it('sends other types as documents with a filename', async () => {
+      const calls = stubGraph();
+      await upload('to=33600000000&filename=invoice.pdf', 'application/pdf');
+      assert.deepEqual(JSON.parse(calls[1]!.body as string).document, { id: 'media.1', filename: 'invoice.pdf' });
+    });
+
+    it('requires a recipient and a body', async () => {
+      assert.equal((await upload('to=abc', 'image/png')).status, 400);
+      assert.equal((await upload('to=33600000000', 'image/png', '')).status, 400);
+    });
+
+    it('enforces the image size cap', async () => {
+      assert.equal((await upload('to=33600000000', 'image/png', 'x'.repeat(5 * 1024 * 1024 + 1))).status, 413);
+    });
+  });
 });
