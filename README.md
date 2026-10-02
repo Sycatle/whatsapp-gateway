@@ -105,10 +105,16 @@ Paths and bodies are Meta's: see the [Cloud API reference](https://developers.fa
 | `DB_PATH` | SQLite file for messages, statuses and contacts, default `data/handler.db` (created with mode 600). |
 | `DOWNLOADS_DIR` | Where received media is saved, default `downloads`. Files are `<media id>.<ext>`, mode 600, capped at 100 MiB, checksum-verified. |
 
+## Not possible through the API
+
+Meta exposes no way to edit or delete a message you sent, to list chats from Meta's side, to read history before the webhook subscription (coexistence history sync aside), to post statuses, or to archive, pin or star chats. Users can edit and delete theirs, and the handler applies that.
+
 ## Usernames (BSUID)
 
 WhatsApp users who adopt a username may reach you without a phone number, only with a business-scoped user id. The handler files such a chat under the BSUID, merges it into the phone chat as soon as both are seen together, and `POST /messages` accepts either as `to`.
 
 ## Limits
+
+`windowOpen` is computed from stored messages: a chat whose last user message predates the database reports a closed window until the user writes again.
 
 Messages, contacts and delivery statuses are kept in a local SQLite file (`node:sqlite`, experimental in Node 22, no dependency). It and `DOWNLOADS_DIR` hold personal data: keep them private and back them up as such. Message content never goes to the logs, but it does go to `EVENTS_URL`: use HTTPS. History messages stay in the store; only their progress is forwarded. A user deleting a message erases its content and file locally. Retried deliveries are dropped using an in-memory window of recent ids; a crash can still lose an event that was acknowledged but not yet processed.

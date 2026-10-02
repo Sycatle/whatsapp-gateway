@@ -30,4 +30,5 @@ Done = `npm run check && npm test` green.
 - Voice notes must be mono Ogg/Opus; the play button needs a file of 512 KB or less.
 - Webhook needs the `messages` field subscription and the app subscribed to the WABA (`docs/meta-setup.md`); coexistence needs more fields.
 - Dedup is in memory only; the store ignores duplicate ids, except that a history `media_placeholder` is replaced by the real message.
+- Users may be known by BSUID only (`from_user_id`); `store.ts` aliases merge BSUID and phone chats. Send with `recipient` for a BSUID.
 - `node:sqlite` is experimental in Node 22 (needs >= 22.13) and returns null-prototype rows: spread them.
