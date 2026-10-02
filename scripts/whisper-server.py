@@ -21,6 +21,7 @@ PORT = int(sys.argv[2]) if len(sys.argv) > 2 else int(os.environ.get("WHISPER_PO
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 model = whisper.load_model(MODEL, device=DEVICE)
+MAX_BODY = 100 * 1024 * 1024
 lock = Lock()  # one transcription at a time: the model is not thread-safe
 
 
@@ -43,16 +44,23 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         if self.path.rstrip("/") != "/v1/audio/transcriptions":
             return self.reply(404, {"error": "not found"})
-        body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > MAX_BODY:
+            self.close_connection = True
+            return self.reply(413, {"error": "file too large"})
+        body = self.rfile.read(length)
         form = parse_form(self.headers.get("Content-Type", ""), body)
         if "file" not in form:
             return self.reply(400, {"error": "missing file"})
-        language = form.get("language", b"").decode() or None
-        with tempfile.NamedTemporaryFile() as audio:
-            audio.write(form["file"])
-            audio.flush()
-            with lock:
-                result = model.transcribe(audio.name, language=language, fp16=DEVICE == "cuda")
+        language = (form.get("language") or b"").decode() or None
+        try:
+            with tempfile.NamedTemporaryFile() as audio:
+                audio.write(form["file"])
+                audio.flush()
+                with lock:
+                    result = model.transcribe(audio.name, language=language, fp16=DEVICE == "cuda")
+        except Exception as error:  # undecodable audio, out of memory...
+            return self.reply(500, {"error": str(error)})
         self.reply(200, {"text": result["text"].strip(), "language": result["language"]})
 
     def do_GET(self) -> None:
