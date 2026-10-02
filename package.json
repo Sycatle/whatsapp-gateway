@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "tsx --env-file=.env src/server.ts",
+    "dev": "tsx --env-file=.env src/index.ts",
     "check": "tsc --noEmit"
   },
   "devDependencies": {
