@@ -94,6 +94,13 @@ describe('POST /messages', () => {
       assert.deepEqual(calls[2]!.contacts, bodies[2]!.contacts);
     });
 
+    it('addresses users known only by BSUID with recipient', async () => {
+      const calls = capture();
+      assert.equal((await post({ to: 'US.13491208655302741918', text: 'hi' })).status, 200);
+      assert.deepEqual([calls[0]!.recipient, calls[0]!.to], ['US.13491208655302741918', undefined]);
+      assert.equal((await post({ to: 'us.nope', text: 'hi' })).status, 400);
+    });
+
     it('sends to a group', async () => {
       const calls = capture();
       await post({ group: 'GROUPID', text: 'hi all' });

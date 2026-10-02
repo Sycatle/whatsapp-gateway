@@ -38,7 +38,7 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | POST | `/media` | Uploads the body and sends it as image, video, audio, sticker or document. Same auth. |
 | GET, DELETE | `/media/:id` | Downloads a media file from Meta by id, or deletes an uploaded one. Same auth. |
 
-`POST /messages` takes JSON: a recipient (`to`: digits only, international format, or `group`), a `type` (default `text`) and the Cloud API object of that type. Optional `reply_to` (a message id) quotes a message.
+`POST /messages` takes JSON: a recipient (`to`: a phone number, digits only in international format, or a business-scoped user id such as `US.1349...`; or `group`), a `type` (default `text`) and the Cloud API object of that type. Optional `reply_to` (a message id) quotes a message.
 
 ```bash
 curl -X POST http://127.0.0.1:3000/messages \
@@ -104,6 +104,10 @@ Paths and bodies are Meta's: see the [Cloud API reference](https://developers.fa
 | `EVENTS_SECRET` | Required with `EVENTS_URL`. Each POST carries `X-Hub-Signature-256: sha256=<HMAC of the body>` keyed with it, so you verify it exactly like Meta's. |
 | `DB_PATH` | SQLite file for messages, statuses and contacts, default `data/handler.db` (created with mode 600). |
 | `DOWNLOADS_DIR` | Where received media is saved, default `downloads`. Files are `<media id>.<ext>`, mode 600, capped at 100 MiB, checksum-verified. |
+
+## Usernames (BSUID)
+
+WhatsApp users who adopt a username may reach you without a phone number, only with a business-scoped user id. The handler files such a chat under the BSUID, merges it into the phone chat as soon as both are seen together, and `POST /messages` accepts either as `to`.
 
 ## Limits
 

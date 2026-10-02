@@ -3,7 +3,8 @@ import { sendJson } from './http.js';
 import type { Context } from './router.js';
 import type { Store } from './store.js';
 
-const CHAT = /^[\w=-]+$/;
+/** Phone numbers, group ids and BSUIDs (`US.123abc`). */
+const CHAT = /^[\w.=-]+$/;
 
 const intParam = (value: string | null, fallback: number, max: number): number => {
   const n = Number(value);

@@ -7,6 +7,10 @@ import type { Store } from './store.js';
 const MAX_JSON = 64 * 1024;
 /** International format without "+", as expected by the Cloud API. */
 const PHONE = /^\d{8,15}$/;
+/** Business-scoped user ID: country code, a period, then alphanumerics (`US.13491208655302741918`, `US.ENT.118...`). */
+const BSUID = /^[A-Z]{2}\.(ENT\.)?[A-Za-z0-9]{1,128}$/;
+const isRecipient = (value: unknown): value is string => typeof value === 'string' && (PHONE.test(value) || BSUID.test(value));
+const RECIPIENT_ERROR = '"to" must be a phone number (digits only, international format) or a business-scoped user id';
 const GROUP_ID = /^[\w=-]+$/;
 
 export interface SendDeps {
@@ -21,7 +25,7 @@ const TYPES = ['text', 'image', 'audio', 'video', 'document', 'sticker', 'locati
 async function deliver(
   { graph, store }: SendDeps,
   res: ServerResponse,
-  target: { chat: string; group: boolean },
+  target: { to: string; group: boolean },
   type: string,
   content: unknown,
   replyTo?: string,
@@ -29,13 +33,14 @@ async function deliver(
   try {
     const id = await graph.sendMessage({
       ...(target.group && { recipient_type: 'group' }),
-      to: target.chat,
+      // Users known only by BSUID are addressed with `recipient`, everyone else with `to`.
+      ...(BSUID.test(target.to) ? { recipient: target.to } : { to: target.to }),
       type,
       [type]: content,
       ...(replyTo && { context: { message_id: replyTo } }),
     });
     const stored: Message = {
-      id, chat: target.chat, from: 'api', direction: 'out', source: 'api', type,
+      id, chat: store.resolveChat(target.to), from: 'api', direction: 'out', source: 'api', type,
       timestamp: Math.floor(Date.now() / 1000), content: Array.isArray(content) ? { items: content } : (content as Message['content']),
       status: 'pending',
     };
@@ -77,7 +82,7 @@ export async function sendMedia(req: IncomingMessage, res: ServerResponse, deps:
   const params = new URL(req.url ?? '/', 'http://localhost').searchParams;
   const to = params.get('to');
   const mimeType = req.headers['content-type']?.trim();
-  if (!to || !PHONE.test(to)) return sendJson(res, 400, { error: '"to" must be digits only, in international format' });
+  if (!isRecipient(to)) return sendJson(res, 400, { error: RECIPIENT_ERROR });
   if (!mimeType) return sendJson(res, 400, { error: 'Content-Type must be the file MIME type' });
 
   const sticker = params.get('sticker') === 'true';
@@ -106,7 +111,7 @@ export async function sendMedia(req: IncomingMessage, res: ServerResponse, deps:
     ...(voice && { voice: true }),
     ...(type === 'document' && { filename }),
   };
-  await deliver(deps, res, { chat: to, group: false }, type, media, params.get('reply_to') ?? undefined);
+  await deliver(deps, res, { to, group: false }, type, media, params.get('reply_to') ?? undefined);
 }
 
 /**
@@ -129,9 +134,7 @@ export async function sendMessage(req: IncomingMessage, res: ServerResponse, dep
 
   const { to, group, reply_to: replyTo } = input;
   if ((to === undefined) === (group === undefined)) return sendJson(res, 400, { error: 'Give either "to" or "group"' });
-  if (to !== undefined && (typeof to !== 'string' || !PHONE.test(to))) {
-    return sendJson(res, 400, { error: '"to" must be digits only, in international format' });
-  }
+  if (to !== undefined && !isRecipient(to)) return sendJson(res, 400, { error: RECIPIENT_ERROR });
   if (group !== undefined && (typeof group !== 'string' || !GROUP_ID.test(group))) {
     return sendJson(res, 400, { error: '"group" must be a group id' });
   }
@@ -155,7 +158,7 @@ export async function sendMessage(req: IncomingMessage, res: ServerResponse, dep
   const valid = type === 'contacts' ? Array.isArray(content) : typeof content === 'object' && content !== null && !Array.isArray(content);
   if (!valid) return sendJson(res, 400, { error: `"${type}" must be ${type === 'contacts' ? 'an array' : 'an object'}` });
 
-  await deliver(deps, res, { chat: (to ?? group) as string, group: group !== undefined }, type, content, replyTo);
+  await deliver(deps, res, { to: (to ?? group) as string, group: group !== undefined }, type, content, replyTo);
 }
 
 /** `POST /read` with `{ message_id, typing? }`: read receipt for a received message, optionally with "typing...". */

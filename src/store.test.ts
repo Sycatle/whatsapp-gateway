@@ -69,6 +69,16 @@ describe('store', () => {
     assert.equal(store.contacts()[0]!.name, null);
   });
 
+  it('merges a BSUID chat into the phone chat once both are seen', () => {
+    store.saveMessages([message({ id: 'b1', chat: 'FR.9', from: 'FR.9', userId: 'FR.9', name: 'Ada' })]);
+    assert.deepEqual(store.conversations().map((c) => c.chat), ['FR.9']);
+    store.saveMessages([message({ id: 'p1', timestamp: 3000, userId: 'FR.9' })]);
+    assert.deepEqual(store.conversations().map((c) => [c.chat, c.messages, c.name]), [['33600000001', 2, 'Ada']]);
+    store.saveMessages([message({ id: 'b2', timestamp: 4000, chat: 'FR.9', from: 'FR.9', userId: 'FR.9' })]);
+    assert.equal(store.messages('FR.9').length, 3);
+    assert.equal(store.resolveChat('FR.9'), '33600000001');
+  });
+
   it('erases a chat and lists its media', () => {
     store.saveMessages([message({ mediaPath: '/d/a.jpg', name: 'Ada' }), message({ id: 'm2', chat: 'other', from: 'other' })]);
     assert.deepEqual(store.deleteChat('33600000001'), ['/d/a.jpg']);

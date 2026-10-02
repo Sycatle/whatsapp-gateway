@@ -58,6 +58,10 @@ export function openStore(path: string) {
       deleted INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS messages_chat ON messages (chat, timestamp);
+    CREATE TABLE IF NOT EXISTS aliases (
+      user_id TEXT PRIMARY KEY,
+      phone TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS contacts (
       phone TEXT PRIMARY KEY,
       name TEXT,
@@ -99,6 +103,14 @@ export function openStore(path: string) {
              status, media_path AS mediaPath, edited, deleted
       FROM messages WHERE chat = ? AND timestamp < ? ORDER BY timestamp DESC, id LIMIT ?`),
     chatMedia: db.prepare('SELECT media_path FROM messages WHERE chat = ? AND media_path IS NOT NULL'),
+    alias: db.prepare('SELECT phone FROM aliases WHERE user_id = ?'),
+    setAlias: db.prepare(`
+      INSERT INTO aliases (user_id, phone) VALUES (?, ?)
+      ON CONFLICT (user_id) DO UPDATE SET phone = excluded.phone`),
+    moveMessages: db.prepare('UPDATE messages SET chat = ? WHERE chat = ?'),
+    moveContact: db.prepare('UPDATE OR IGNORE contacts SET phone = ? WHERE phone = ?'),
+    dropContact: db.prepare('DELETE FROM contacts WHERE phone = ?'),
+    deleteAliases: db.prepare('DELETE FROM aliases WHERE phone = ?'),
     deleteMessages: db.prepare('DELETE FROM messages WHERE chat = ?'),
     deleteContact: db.prepare('DELETE FROM contacts WHERE phone = ?'),
   };
@@ -116,10 +128,28 @@ export function openStore(path: string) {
   };
   const run = (statement: ReturnType<typeof db.prepare>, ...params: SQLInputValue[]) => statement.run(...params);
 
+  /** The phone number a BSUID is known under, else the id itself. */
+  const resolve = (id: string): string => (q.alias.get(id) as { phone: string } | undefined)?.phone ?? id;
+
+  /** A user seen under both a phone number and a BSUID is one chat: merge what was filed under the BSUID. */
+  const link = (userId: string, phone: string): void => {
+    if (userId === phone || resolve(userId) === phone) return;
+    run(q.setAlias, userId, phone);
+    run(q.moveMessages, phone, userId);
+    run(q.moveContact, phone, userId);
+    run(q.dropContact, userId);
+  };
+
   return {
+    resolveChat: resolve,
+
     saveMessages(messages: Message[]): void {
       transaction(() => {
-        for (const m of messages) {
+        for (const original of messages) {
+          if (original.userId && original.chat === original.from && original.userId !== original.chat) {
+            link(original.userId, original.chat);
+          }
+          const m = { ...original, chat: resolve(original.chat) };
           run(q.insert, m.id, m.chat, m.from, m.direction, m.source, m.type, JSON.stringify(m.content), m.contextId ?? null,
             m.timestamp, m.status ?? null, m.mediaPath ?? null);
           if (m.name && m.direction === 'in') run(q.profile, m.chat, m.name);
@@ -166,7 +196,7 @@ export function openStore(path: string) {
 
     /** Newest first. Pass the oldest timestamp received as `before` to get the previous page. */
     messages(chat: string, limit = 50, before = Number.MAX_SAFE_INTEGER): StoredMessage[] {
-      const rows = q.thread.all(chat, before, limit) as (Omit<StoredMessage, 'content' | 'edited' | 'deleted'> & {
+      const rows = q.thread.all(resolve(chat), before, limit) as (Omit<StoredMessage, 'content' | 'edited' | 'deleted'> & {
         content: string | null; edited: number; deleted: number;
       })[];
       return rows.map((row) => ({
@@ -178,11 +208,13 @@ export function openStore(path: string) {
     },
 
     /** Erases everything held about a chat and returns the media files to remove. */
-    deleteChat(chat: string): string[] {
+    deleteChat(id: string): string[] {
       return transaction(() => {
+        const chat = resolve(id);
         const paths = (q.chatMedia.all(chat) as { media_path: string }[]).map((row) => row.media_path);
         run(q.deleteMessages, chat);
         run(q.deleteContact, chat);
+        run(q.deleteAliases, chat);
         return paths;
       });
     },

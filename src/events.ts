@@ -14,6 +14,8 @@ export interface Message {
   /** The type-specific object of the payload (`text`, `image`, `location`...). */
   content: Record<string, unknown>;
   contextId?: string;
+  /** Business-scoped user ID of the user, present once WhatsApp usernames roll out. */
+  userId?: string;
   name?: string;
   /** Delivery status, known for history messages only. */
   status?: string;
@@ -94,6 +96,7 @@ interface Origin {
   direction: Direction;
   source: Source;
   name?: string;
+  userId?: string;
 }
 
 function toMessage(raw: Obj, origin: Origin): Message | null {
@@ -108,8 +111,9 @@ function toMessage(raw: Obj, origin: Origin): Message | null {
     source: origin.source,
     type,
     timestamp: num(raw.timestamp) ?? now(),
-    content: rec(raw[type]),
+    content: raw.errors ? { ...rec(raw[type]), errors: raw.errors } : rec(raw[type]),
   };
+  if (origin.userId) message.userId = origin.userId;
   const contextId = str(rec(raw.context).id);
   if (contextId) message.contextId = contextId;
   if (origin.name) message.name = origin.name;
@@ -121,12 +125,15 @@ function toMessage(raw: Obj, origin: Origin): Message | null {
 function parseMessages(value: Obj, event: ParsedEvent): void {
   const names = new Map<string, string>();
   for (const contact of arr(value.contacts).map(rec)) {
-    const waId = str(contact.wa_id);
-    const name = str(rec(contact.profile).name);
-    if (waId && name) names.set(waId, name);
+    const profile = rec(contact.profile);
+    const name = str(profile.name) ?? str(profile.username);
+    if (!name) continue;
+    for (const key of [str(contact.wa_id), str(contact.user_id)]) if (key) names.set(key, name);
   }
   for (const raw of arr(value.messages).map(rec)) {
-    const from = str(raw.from);
+    // Users with a WhatsApp username may be known by their BSUID only.
+    const userId = str(raw.from_user_id);
+    const from = str(raw.from) ?? userId;
     const chat = str(raw.group_id) ?? from;
     if (!chat) continue;
     if (raw.type === 'edit' || raw.type === 'revoke') {
@@ -145,13 +152,14 @@ function parseMessages(value: Obj, event: ParsedEvent): void {
       }
       continue;
     }
-    const message = toMessage(raw, { chat, direction: 'in', source: 'webhook', name: from && names.get(from) });
+    const name = names.get(from!) ?? (userId ? names.get(userId) : undefined);
+    const message = toMessage(raw, { chat, direction: 'in', source: 'webhook', name, userId });
     if (message) event.messages.push(message);
   }
   for (const raw of arr(value.statuses).map(rec)) {
     const id = str(raw.id);
     const status = str(raw.status);
-    const recipient = str(raw.recipient_id);
+    const recipient = str(raw.recipient_id) ?? str(raw.recipient_user_id);
     if (!id || !status || !recipient) continue;
     const parsed: Status = { id, status, recipient, timestamp: num(raw.timestamp) ?? now() };
     if (raw.errors) parsed.errors = raw.errors;

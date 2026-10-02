@@ -60,6 +60,26 @@ suite('parseEvent: messages field', () => {
   });
 });
 
+suite('parseEvent: business-scoped user ids', () => {
+  it('falls back to the BSUID when the phone number is not shared', () => {
+    const { messages, statuses } = parseEvent(wrap({
+      contacts: [{ user_id: 'US.123', profile: { name: 'Ada', username: 'ada' } }],
+      messages: [{ id: 'm', from_user_id: 'US.123', timestamp: '1', type: 'text', text: { body: 'hi' } }],
+      statuses: [{ id: 's', status: 'delivered', recipient_user_id: 'US.123' }],
+    }));
+    assert.deepEqual([messages[0]!.chat, messages[0]!.userId, messages[0]!.name], ['US.123', 'US.123', 'Ada']);
+    assert.equal(statuses[0]!.recipient, 'US.123');
+  });
+
+  it('keeps both identifiers when both are present, and unsupported-message errors', () => {
+    const { messages } = parseEvent(wrap({
+      messages: [{ id: 'm', from: '33600000001', from_user_id: 'FR.9', timestamp: '1', type: 'unsupported', errors: [{ code: 131060 }] }],
+    }));
+    assert.deepEqual([messages[0]!.chat, messages[0]!.userId], ['33600000001', 'FR.9']);
+    assert.deepEqual(messages[0]!.content, { errors: [{ code: 131060 }] });
+  });
+});
+
 suite('parseEvent: coexistence fields', () => {
   it('reads messages sent from the Business app', () => {
     const { messages } = parseEvent(wrap({
