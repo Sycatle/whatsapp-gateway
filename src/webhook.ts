@@ -4,7 +4,8 @@ import { safeEqual, verifySignature } from './auth.js';
 import type { Config } from './config.js';
 import { describe, dropSeen, parseEvent, type ParsedEvent, type SeenKeys } from './events.js';
 
-const MAX_BODY = 1024 * 1024;
+/** History webhooks can carry thousands of messages in one body. */
+const MAX_BODY = 16 * 1024 * 1024;
 
 export function verifyHandshake(url: URL, res: ServerResponse, config: Config): void {
   const valid = url.searchParams.get('hub.mode') === 'subscribe'

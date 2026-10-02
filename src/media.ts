@@ -1,9 +1,11 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { InboundMessage } from './events.js';
+import type { Message } from './events.js';
 import type { Graph } from './graph.js';
 
 const MAX_BYTES = 100 * 1024 * 1024;
+
+const MEDIA_TYPES = ['image', 'audio', 'document'];
 
 const EXTENSIONS: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -18,16 +20,16 @@ const EXTENSIONS: Record<string, string> = {
 };
 
 /** Saves the media attached to a message, if any, and returns its path. */
-export async function saveMedia(graph: Graph, dir: string, message: InboundMessage): Promise<string | null> {
-  const media = message.image ?? message.audio ?? message.document;
-  if (!media) return null;
+export async function saveMedia(graph: Graph, dir: string, message: Pick<Message, 'type' | 'content'>): Promise<string | null> {
+  const id = MEDIA_TYPES.includes(message.type) ? message.content.id : undefined;
+  if (typeof id !== 'string') return null;
   // Ids come from the network and end up in a path: never trust them.
-  if (!/^\w+$/.test(media.id)) throw new Error('Unexpected media id');
+  if (!/^\w+$/.test(id)) throw new Error('Unexpected media id');
 
-  const { bytes, mimeType } = await graph.download(media.id, MAX_BYTES);
+  const { bytes, mimeType } = await graph.download(id, MAX_BYTES);
   const extension = EXTENSIONS[mimeType.split(';')[0]!.trim()] ?? 'bin';
   await mkdir(dir, { recursive: true, mode: 0o700 });
-  const path = join(dir, `${media.id}.${extension}`);
+  const path = join(dir, `${id}.${extension}`);
   await writeFile(path, bytes, { mode: 0o600 });
   return path;
 }

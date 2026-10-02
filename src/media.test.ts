@@ -22,13 +22,13 @@ afterEach(() => mock.restoreAll());
 
 describe('saveMedia', () => {
   it('ignores messages without media', async () => {
-    assert.equal(await saveMedia(graph, '/nowhere', { id: 'a', from: '1', type: 'text' }), null);
+    assert.equal(await saveMedia(graph, '/nowhere', { type: 'text', content: { body: 'hi' } }), null);
   });
 
   it('downloads with the bearer token and writes a private file named after the id', async () => {
     const fetchMock = stubGraph({ sha256 });
     const dir = join(await mkdtemp(join(tmpdir(), 'wa-')), 'downloads');
-    const path = await saveMedia(graph, dir, { id: 'a', from: '1', type: 'image', image: { id: '555', mime_type: 'image/jpeg' } });
+    const path = await saveMedia(graph, dir, { type: 'image', content: { id: '555', mime_type: 'image/jpeg' } });
     assert.equal(path, join(dir, '555.jpg'));
     assert.deepEqual(await readFile(path!), file);
     assert.equal((await stat(path!)).mode & 0o777, 0o600);
@@ -38,12 +38,12 @@ describe('saveMedia', () => {
 
   it('rejects a checksum mismatch', async () => {
     stubGraph({ sha256: 'deadbeef' });
-    const message = { id: 'a', from: '1', type: 'image', image: { id: '555', mime_type: 'image/jpeg' } };
+    const message = { type: 'image', content: { id: '555', mime_type: 'image/jpeg' } };
     await assert.rejects(saveMedia(graph, await mkdtemp(join(tmpdir(), 'wa-')), message), /checksum/);
   });
 
   it('refuses ids that could escape the directory', async () => {
-    const message = { id: 'a', from: '1', type: 'image', image: { id: '../evil', mime_type: 'image/jpeg' } };
+    const message = { type: 'image', content: { id: '../evil', mime_type: 'image/jpeg' } };
     await assert.rejects(saveMedia(graph, '/nowhere', message), /Unexpected media id/);
   });
 });

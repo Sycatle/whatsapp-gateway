@@ -24,7 +24,7 @@ The server listens on `127.0.0.1` only; expose it to Meta through an HTTPS tunne
 | --- | --- | --- |
 | GET | `/health` | `{"ok":true}` |
 | GET | `/webhook` | Meta verification handshake. |
-| POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per message or status (phone masked, no content). With sending configured, also saves received images, audio, voice notes and documents to `DOWNLOADS_DIR`. Bodies over 1 MiB get 413. |
+| POST | `/webhook` | Checks the signature (403 if invalid), acknowledges, logs one line per item (ids masked, no content). Understands every message type, edits and deletions by users, messages sent from the Business app, history and contact sync (coexistence), and passes other fields (templates, quality, account updates) through. With sending configured, also saves received images, audio, voice notes and documents to `DOWNLOADS_DIR`. Bodies over 16 MiB get 413. |
 | POST | `/messages` | Sends a text. Requires `Authorization: Bearer $API_KEY`. 503 if sending is not configured. |
 | POST | `/media` | Uploads the body and sends it as image, audio or document. Same auth. |
 

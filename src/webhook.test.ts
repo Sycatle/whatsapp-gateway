@@ -51,8 +51,8 @@ describe('POST /webhook', () => {
     assert.equal((await post(body, sign(body))).status, 400);
   });
 
-  it('rejects bodies over 1 MiB', async () => {
-    const body = 'x'.repeat(1024 * 1024 + 1);
+  it('rejects bodies over 16 MiB', async () => {
+    const body = 'x'.repeat(16 * 1024 * 1024 + 1);
     assert.equal((await post(body, sign(body))).status, 413);
   });
 });
